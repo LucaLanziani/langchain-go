@@ -1,0 +1,32 @@
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python LangChain reference (not part of the Go project)
+langchain/
+
+# BMAD planning artifacts
+_bmad/
+_bmad-output/
+
+# Cursor plans
+.cursor/plans/
