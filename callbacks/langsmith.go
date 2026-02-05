@@ -10,19 +10,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // LangSmithHandler sends tracing data to LangSmith for observability.
 type LangSmithHandler struct {
 	core.BaseCallbackHandler
 
-	apiKey    string
-	endpoint  string
-	project   string
-	client    *http.Client
-	runs      map[string]*langSmithRun
-	mu        sync.Mutex
+	apiKey   string
+	endpoint string
+	project  string
+	client   *http.Client
+	runs     map[string]*langSmithRun
+	mu       sync.Mutex
 }
 
 type langSmithRun struct {

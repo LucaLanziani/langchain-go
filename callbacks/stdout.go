@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // StdoutHandler prints callback events to stdout for debugging.

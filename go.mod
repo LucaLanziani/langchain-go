@@ -1,4 +1,4 @@
-module github.com/langchain-go/langchain-go
+module github.com/LucaLanziani/langchain-go
 
 go 1.24.0
 

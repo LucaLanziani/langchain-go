@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // step wraps a single runnable in the sequence with type erasure,

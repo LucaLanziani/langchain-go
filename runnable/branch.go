@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // BranchCondition pairs a condition function with a runnable.
@@ -18,9 +18,9 @@ type BranchCondition[I, O any] struct {
 // If no conditions match, the default runnable is used.
 // It implements Runnable[I, O].
 type Branch[I, O any] struct {
-	conditions     []BranchCondition[I, O]
-	defaultBranch  core.Runnable[I, O]
-	name           string
+	conditions    []BranchCondition[I, O]
+	defaultBranch core.Runnable[I, O]
+	name          string
 }
 
 // NewBranch creates a new Branch runnable.

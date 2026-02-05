@@ -5,16 +5,16 @@ package callbacks
 import (
 	"context"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // Manager coordinates multiple callback handlers, dispatching events to all of them.
 type Manager struct {
-	handlers          []core.CallbackHandler
+	handlers            []core.CallbackHandler
 	inheritableHandlers []core.CallbackHandler
-	parentRunID       string
-	tags              []string
-	metadata          map[string]any
+	parentRunID         string
+	tags                []string
+	metadata            map[string]any
 }
 
 // NewManager creates a new callback Manager.

@@ -3,7 +3,7 @@ package memory
 import (
 	"context"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // ConversationBufferMemory stores the entire conversation history.

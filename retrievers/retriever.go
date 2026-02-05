@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/vectorstores"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/vectorstores"
 )
 
 // Retriever is the interface for document retrievers.
@@ -22,9 +22,9 @@ type Retriever interface {
 
 // VectorStoreRetriever wraps a VectorStore as a Retriever.
 type VectorStoreRetriever struct {
-	store     vectorstores.VectorStore
-	k         int
-	name      string
+	store vectorstores.VectorStore
+	k     int
+	name  string
 }
 
 // NewVectorStoreRetriever creates a retriever from a vector store.

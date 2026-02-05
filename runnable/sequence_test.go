@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // mockRunnable is a test helper.

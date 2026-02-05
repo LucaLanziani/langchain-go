@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/embeddings"
-	"github.com/langchain-go/langchain-go/vectorstores"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/embeddings"
+	"github.com/LucaLanziani/langchain-go/vectorstores"
 )
 
 type storedDoc struct {

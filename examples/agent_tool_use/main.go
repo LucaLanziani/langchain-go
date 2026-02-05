@@ -15,12 +15,12 @@ import (
 	"log"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/agents"
-	"github.com/langchain-go/langchain-go/callbacks"
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/prompts"
-	"github.com/langchain-go/langchain-go/providers/openai"
-	"github.com/langchain-go/langchain-go/tools"
+	"github.com/LucaLanziani/langchain-go/agents"
+	"github.com/LucaLanziani/langchain-go/callbacks"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/prompts"
+	"github.com/LucaLanziani/langchain-go/providers/openai"
+	"github.com/LucaLanziani/langchain-go/tools"
 )
 
 func main() {

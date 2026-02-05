@@ -1,7 +1,7 @@
 package llms
 
 import (
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // ChatResult holds the complete result of a chat model invocation.

@@ -9,7 +9,7 @@ Go ecosystem.
 ## Quickstart
 
 ```bash
-go get github.com/langchain-go/langchain-go
+go get github.com/LucaLanziani/langchain-go
 ```
 
 ### Simple chain (prompt + model + parser)
@@ -22,10 +22,10 @@ import (
     "fmt"
     "log"
 
-    "github.com/langchain-go/langchain-go/outputparsers"
-    "github.com/langchain-go/langchain-go/prompts"
-    "github.com/langchain-go/langchain-go/providers/openai"
-    "github.com/langchain-go/langchain-go/runnable"
+    "github.com/LucaLanziani/langchain-go/outputparsers"
+    "github.com/LucaLanziani/langchain-go/prompts"
+    "github.com/LucaLanziani/langchain-go/providers/openai"
+    "github.com/LucaLanziani/langchain-go/runnable"
 )
 
 func main() {
@@ -59,10 +59,10 @@ import (
     "fmt"
     "log"
 
-    "github.com/langchain-go/langchain-go/agents"
-    "github.com/langchain-go/langchain-go/prompts"
-    "github.com/langchain-go/langchain-go/providers/openai"
-    "github.com/langchain-go/langchain-go/tools"
+    "github.com/LucaLanziani/langchain-go/agents"
+    "github.com/LucaLanziani/langchain-go/prompts"
+    "github.com/LucaLanziani/langchain-go/providers/openai"
+    "github.com/LucaLanziani/langchain-go/tools"
 )
 
 func main() {
@@ -146,7 +146,7 @@ type Runnable[I, O any] interface {
 ### OpenAI
 
 ```go
-import "github.com/langchain-go/langchain-go/providers/openai"
+import "github.com/LucaLanziani/langchain-go/providers/openai"
 
 model := openai.New(
     openai.WithAPIKey("sk-..."),       // or OPENAI_API_KEY env var
@@ -157,7 +157,7 @@ model := openai.New(
 ### Anthropic
 
 ```go
-import "github.com/langchain-go/langchain-go/providers/anthropic"
+import "github.com/LucaLanziani/langchain-go/providers/anthropic"
 
 model := anthropic.New(
     anthropic.WithAPIKey("sk-..."),    // or ANTHROPIC_API_KEY env var

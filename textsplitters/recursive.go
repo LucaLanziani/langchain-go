@@ -4,7 +4,7 @@ package textsplitters
 import (
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // RecursiveCharacterTextSplitter splits text by recursively trying different

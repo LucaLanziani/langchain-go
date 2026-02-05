@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // MessageTemplate represents a single message template within a ChatPromptTemplate.

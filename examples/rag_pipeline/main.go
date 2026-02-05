@@ -14,13 +14,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/langchain-go/langchain-go/chains"
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/prompts"
-	"github.com/langchain-go/langchain-go/providers/openai"
-	"github.com/langchain-go/langchain-go/retrievers"
-	"github.com/langchain-go/langchain-go/textsplitters"
-	"github.com/langchain-go/langchain-go/vectorstores/inmemory"
+	"github.com/LucaLanziani/langchain-go/chains"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/prompts"
+	"github.com/LucaLanziani/langchain-go/providers/openai"
+	"github.com/LucaLanziani/langchain-go/retrievers"
+	"github.com/LucaLanziani/langchain-go/textsplitters"
+	"github.com/LucaLanziani/langchain-go/vectorstores/inmemory"
 )
 
 func main() {

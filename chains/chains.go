@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/llms"
-	"github.com/langchain-go/langchain-go/prompts"
-	"github.com/langchain-go/langchain-go/retrievers"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/llms"
+	"github.com/LucaLanziani/langchain-go/prompts"
+	"github.com/LucaLanziani/langchain-go/retrievers"
 )
 
 // LLMChain is the simplest chain: prompt -> model -> output.
@@ -96,11 +96,11 @@ func (c *LLMChain) Batch(ctx context.Context, inputs []map[string]any, opts ...c
 // StuffDocumentsChain combines retrieved documents into a single context
 // and passes them to an LLM chain.
 type StuffDocumentsChain struct {
-	llmChain     *LLMChain
-	documentKey  string
-	inputKey     string
-	separator    string
-	name         string
+	llmChain    *LLMChain
+	documentKey string
+	inputKey    string
+	separator   string
+	name        string
 }
 
 // NewStuffDocumentsChain creates a chain that "stuffs" all documents into the prompt.

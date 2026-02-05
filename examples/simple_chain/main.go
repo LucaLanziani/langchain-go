@@ -11,10 +11,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/langchain-go/langchain-go/outputparsers"
-	"github.com/langchain-go/langchain-go/prompts"
-	"github.com/langchain-go/langchain-go/providers/openai"
-	"github.com/langchain-go/langchain-go/runnable"
+	"github.com/LucaLanziani/langchain-go/outputparsers"
+	"github.com/LucaLanziani/langchain-go/prompts"
+	"github.com/LucaLanziani/langchain-go/providers/openai"
+	"github.com/LucaLanziani/langchain-go/runnable"
 )
 
 func main() {

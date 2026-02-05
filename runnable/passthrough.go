@@ -3,7 +3,7 @@ package runnable
 import (
 	"context"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // Passthrough passes its input through unchanged.

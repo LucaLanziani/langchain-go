@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/tools"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/tools"
 )
 
 // Agent is the interface for the planning component that decides what to do next.
@@ -24,10 +24,10 @@ type Agent interface {
 // AgentExecutor runs an agent loop: plan -> execute tool -> plan -> ... -> finish.
 // It implements Runnable[map[string]any, map[string]any].
 type AgentExecutor struct {
-	agent         Agent
-	tools         []tools.Tool
-	toolMap       map[string]tools.Tool
-	maxIterations int
+	agent                   Agent
+	tools                   []tools.Tool
+	toolMap                 map[string]tools.Tool
+	maxIterations           int
 	returnIntermediateSteps bool
 	handleParsingErrors     bool
 	name                    string

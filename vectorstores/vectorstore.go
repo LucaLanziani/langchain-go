@@ -4,8 +4,8 @@ package vectorstores
 import (
 	"context"
 
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/embeddings"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/embeddings"
 )
 
 // VectorStore is the interface for vector stores that support

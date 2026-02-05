@@ -3,7 +3,7 @@ package textsplitters
 import (
 	"testing"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 func TestRecursiveCharacterTextSplitter(t *testing.T) {

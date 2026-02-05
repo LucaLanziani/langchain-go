@@ -4,7 +4,7 @@ package llms
 import (
 	"context"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // ChatModel is the interface that all chat model implementations must satisfy.

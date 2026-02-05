@@ -6,10 +6,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/llms"
-	"github.com/langchain-go/langchain-go/prompts"
-	"github.com/langchain-go/langchain-go/tools"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/llms"
+	"github.com/LucaLanziani/langchain-go/prompts"
+	"github.com/LucaLanziani/langchain-go/tools"
 )
 
 // ReAct agent output parsing regex.

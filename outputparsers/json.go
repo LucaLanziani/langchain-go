@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // jsonBlockRegex matches ```json ... ``` code blocks.

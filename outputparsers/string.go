@@ -5,7 +5,7 @@ package outputparsers
 import (
 	"context"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // StringOutputParser extracts the text content from an AI message.

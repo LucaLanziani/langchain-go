@@ -1,14 +1,14 @@
 package llms
 
-import "github.com/langchain-go/langchain-go/core"
+import "github.com/LucaLanziani/langchain-go/core"
 
 // Common ChatModel option keys used in RunnableConfig.Configurable.
 const (
-	ConfigKeyTemperature  = "temperature"
-	ConfigKeyMaxTokens    = "max_tokens"
-	ConfigKeyTopP         = "top_p"
-	ConfigKeyModel        = "model"
-	ConfigKeyResponseFmt  = "response_format"
+	ConfigKeyTemperature = "temperature"
+	ConfigKeyMaxTokens   = "max_tokens"
+	ConfigKeyTopP        = "top_p"
+	ConfigKeyModel       = "model"
+	ConfigKeyResponseFmt = "response_format"
 )
 
 // WithTemperature sets the temperature for generation.

@@ -3,7 +3,7 @@
 package agents
 
 import (
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // AgentAction represents a request from the agent to execute a tool.

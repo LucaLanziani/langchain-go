@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 // Parallel runs multiple runnables in parallel with the same input,

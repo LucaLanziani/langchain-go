@@ -11,8 +11,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/llms"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/llms"
 )
 
 const anthropicAPIVersion = "2023-06-01"
@@ -443,13 +443,13 @@ type toolCallAccumulator struct {
 // Anthropic API types
 
 type anthropicResponse struct {
-	ID         string                `json:"id"`
-	Type       string                `json:"type"`
-	Role       string                `json:"role"`
-	Content    []anthropicContent    `json:"content"`
-	Model      string                `json:"model"`
-	StopReason string                `json:"stop_reason"`
-	Usage      *anthropicUsage       `json:"usage,omitempty"`
+	ID         string             `json:"id"`
+	Type       string             `json:"type"`
+	Role       string             `json:"role"`
+	Content    []anthropicContent `json:"content"`
+	Model      string             `json:"model"`
+	StopReason string             `json:"stop_reason"`
+	Usage      *anthropicUsage    `json:"usage,omitempty"`
 }
 
 type anthropicContent struct {

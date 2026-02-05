@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/llms"
-	"github.com/langchain-go/langchain-go/prompts"
-	"github.com/langchain-go/langchain-go/tools"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/llms"
+	"github.com/LucaLanziani/langchain-go/prompts"
+	"github.com/LucaLanziani/langchain-go/tools"
 )
 
 // ToolCallingAgent uses a chat model's native tool calling capability.
@@ -62,9 +62,9 @@ func (a *ToolCallingAgent) Plan(ctx context.Context, intermediateSteps []AgentSt
 		actions := make([]AgentAction, len(response.ToolCalls))
 		for i, tc := range response.ToolCalls {
 			actions[i] = AgentAction{
-				Tool:      tc.Name,
-				ToolInput: string(tc.Args),
-				Log:       fmt.Sprintf("Calling tool: %s", tc.Name),
+				Tool:       tc.Name,
+				ToolInput:  string(tc.Args),
+				Log:        fmt.Sprintf("Calling tool: %s", tc.Name),
 				MessageLog: []core.Message{response},
 			}
 		}

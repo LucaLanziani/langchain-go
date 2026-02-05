@@ -11,17 +11,17 @@ import (
 	"os"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
-	"github.com/langchain-go/langchain-go/llms"
+	"github.com/LucaLanziani/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/llms"
 )
 
 // ChatModel is the OpenAI chat completion implementation.
 type ChatModel struct {
-	opts            *Options
-	client          *http.Client
-	boundTools      []llms.ToolDefinition
+	opts             *Options
+	client           *http.Client
+	boundTools       []llms.ToolDefinition
 	structuredSchema map[string]any
-	name            string
+	name             string
 }
 
 // New creates a new OpenAI ChatModel.
@@ -439,30 +439,30 @@ type toolCallBuilder struct {
 // OpenAI API types
 
 type openAIChatResponse struct {
-	ID      string              `json:"id"`
-	Object  string              `json:"object"`
-	Created int64               `json:"created"`
-	Model   string              `json:"model"`
-	Choices []openAIChatChoice  `json:"choices"`
-	Usage   *openAIUsage        `json:"usage,omitempty"`
+	ID      string             `json:"id"`
+	Object  string             `json:"object"`
+	Created int64              `json:"created"`
+	Model   string             `json:"model"`
+	Choices []openAIChatChoice `json:"choices"`
+	Usage   *openAIUsage       `json:"usage,omitempty"`
 }
 
 type openAIChatChoice struct {
-	Index        int              `json:"index"`
-	Message      openAIChatMsg    `json:"message"`
-	FinishReason string           `json:"finish_reason"`
+	Index        int           `json:"index"`
+	Message      openAIChatMsg `json:"message"`
+	FinishReason string        `json:"finish_reason"`
 }
 
 type openAIChatMsg struct {
-	Role      string               `json:"role"`
-	Content   string               `json:"content"`
-	ToolCalls []openAIToolCall      `json:"tool_calls,omitempty"`
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []openAIToolCall `json:"tool_calls,omitempty"`
 }
 
 type openAIToolCall struct {
-	ID       string              `json:"id"`
-	Type     string              `json:"type"`
-	Function openAIFunctionCall  `json:"function"`
+	ID       string             `json:"id"`
+	Type     string             `json:"type"`
+	Function openAIFunctionCall `json:"function"`
 }
 
 type openAIFunctionCall struct {
@@ -477,12 +477,12 @@ type openAIUsage struct {
 }
 
 type openAIStreamChunk struct {
-	ID      string                   `json:"id"`
-	Object  string                   `json:"object"`
-	Created int64                    `json:"created"`
-	Model   string                   `json:"model"`
-	Choices []openAIStreamChoice     `json:"choices"`
-	Usage   *openAIUsage             `json:"usage,omitempty"`
+	ID      string               `json:"id"`
+	Object  string               `json:"object"`
+	Created int64                `json:"created"`
+	Model   string               `json:"model"`
+	Choices []openAIStreamChoice `json:"choices"`
+	Usage   *openAIUsage         `json:"usage,omitempty"`
 }
 
 type openAIStreamChoice struct {
@@ -492,9 +492,9 @@ type openAIStreamChoice struct {
 }
 
 type openAIStreamDelta struct {
-	Role      string                  `json:"role,omitempty"`
-	Content   string                  `json:"content,omitempty"`
-	ToolCalls []openAIStreamToolCall  `json:"tool_calls,omitempty"`
+	Role      string                 `json:"role,omitempty"`
+	Content   string                 `json:"content,omitempty"`
+	ToolCalls []openAIStreamToolCall `json:"tool_calls,omitempty"`
 }
 
 type openAIStreamToolCall struct {

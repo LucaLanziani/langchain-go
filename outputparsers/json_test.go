@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 type testStruct struct {

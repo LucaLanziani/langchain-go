@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/langchain-go/langchain-go/core"
+	"github.com/LucaLanziani/langchain-go/core"
 )
 
 var templateVarRegex = regexp.MustCompile(`\{(\w+)\}`)
