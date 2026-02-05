@@ -1,0 +1,68 @@
+---
+description: Testing standards for langchain-go
+globs: "**/*_test.go"
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Unit tests
+
+- Same package as source (white-box testing).
+- File naming: `<source>_test.go` (e.g., `template_test.go` for `template.go`).
+- Mock external services. Never call real APIs.
+- Use `context.Background()` in tests.
+
+## Test patterns
+
+```go
+func TestMyFunction(t *testing.T) {
+    result, err := MyFunction(context.Background(), input)
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if result != expected {
+        t.Errorf("expected %v, got %v", expected, result)
+    }
+}
+```
+
+For Runnable implementations, always test all three methods:
+
+```go
+func TestMyRunnable_Invoke(t *testing.T) { ... }
+func TestMyRunnable_Batch(t *testing.T) { ... }
+func TestMyRunnable_Stream(t *testing.T) { ... }
+```
+
+## Integration tests
+
+Require API keys. Guard with a build tag:
+
+```go
+//go:build integration
+
+package openai_test
+```
+
+Run with: `go test -tags=integration ./providers/openai/...`
+
+## Mock runnables
+
+Use this pattern from `runnable/sequence_test.go`:
+
+```go
+type mockRunnable[I, O any] struct {
+    fn   func(ctx context.Context, input I) (O, error)
+    name string
+}
+// Implement Invoke, Stream, Batch, GetName
+```
+
+## Running tests
+
+```bash
+go test ./...          # unit tests only
+go vet ./...           # static analysis
+go test -race ./...    # race detector
+```

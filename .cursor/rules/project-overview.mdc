@@ -1,0 +1,41 @@
+---
+description: langchain-go project overview, architecture, and package structure
+alwaysApply: true
+---
+
+# langchain-go Project Overview
+
+langchain-go is a from-scratch Go implementation of the LangChain framework.
+It is NOT a wrapper or fork of tmc/langchaingo -- it is an independent codebase
+that ports Python LangChain's abstractions to idiomatic Go.
+
+## Reference implementation
+
+The Python LangChain source lives at `langchain/libs/core/` in this repo
+for reference. Do not modify it. The Go code lives at the repo root.
+
+## Package map
+
+| Package | Purpose |
+|---|---|
+| `core/` | Foundational types: `Runnable[I,O]`, messages, documents, config, callbacks |
+| `prompts/` | `PromptTemplate`, `ChatPromptTemplate`, `MessagesPlaceholder` |
+| `outputparsers/` | `StringOutputParser`, `JSONOutputParser[T]` |
+| `runnable/` | Composition: `Pipe2`-`Pipe4`, `Parallel`, `Lambda`, `Passthrough`, `Branch`, `Assign` |
+| `llms/` | `ChatModel` interface, `ToolDefinition`, `ChatResult`, option helpers |
+| `providers/openai/` | OpenAI chat + embeddings |
+| `providers/anthropic/` | Anthropic/Claude chat |
+| `tools/` | `Tool` interface, `NewTool`, `NewTypedTool[T]`, schema generation |
+| `agents/` | `Agent` interface, `AgentExecutor`, `ToolCallingAgent`, `ReActAgent` |
+| `chains/` | `LLMChain`, `StuffDocumentsChain`, `RetrievalQA` |
+| `memory/` | `Memory` interface, `ConversationBufferMemory`, `ConversationWindowMemory` |
+| `embeddings/` | `Embedder` interface |
+| `vectorstores/` | `VectorStore` interface; `inmemory/` implementation |
+| `retrievers/` | `Retriever` interface, `VectorStoreRetriever` |
+| `textsplitters/` | `RecursiveCharacterTextSplitter` |
+| `callbacks/` | `Manager`, `StdoutHandler`, `LangSmithHandler` |
+
+## Key architectural rule
+
+Every component implements `core.Runnable[I, O]` with `Invoke`, `Stream`, `Batch`, and `GetName`.
+When adding a new component, it MUST satisfy the Runnable interface for its input/output types.

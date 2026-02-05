@@ -1,0 +1,55 @@
+---
+description: Go coding standards and idioms for langchain-go
+globs: "**/*.go"
+alwaysApply: false
+---
+
+# Go Coding Conventions
+
+## Design principles
+
+- **No async/sync split.** Go has goroutines. Every method is one version; use `context.Context` for cancellation.
+- **Explicit errors.** All fallible methods return `(result, error)`. Never panic for expected failures.
+- **Functional options.** Use `...core.Option` for optional configuration, not builder chains or config structs as arguments.
+- **Interfaces over inheritance.** Define small interfaces. Concrete types embed `core.BaseCallbackHandler` for no-op defaults.
+- **Generics where they help.** Use `Runnable[I, O]`, `StreamIterator[T]`, `NewTypedTool[T]`. Fall back to `any` only when heterogeneous types must be composed (e.g., `runnable.Sequence` internals).
+
+## Method signatures
+
+Every Runnable component follows this exact pattern:
+
+```go
+func (x *MyType) Invoke(ctx context.Context, input I, opts ...core.Option) (O, error)
+func (x *MyType) Stream(ctx context.Context, input I, opts ...core.Option) (*core.StreamIterator[O], error)
+func (x *MyType) Batch(ctx context.Context, inputs []I, opts ...core.Option) ([]O, error)
+func (x *MyType) GetName() string
+```
+
+## Naming
+
+- Constructors: `New<Type>()` (e.g., `NewChatPromptTemplate`, `NewAgentExecutor`)
+- Tracing name setter: `WithName(string)` returning a pointer to self
+- Option functions: `With<Field>(value)` returning `core.Option`
+- Provider-specific options: `<Package>.OptionFunc` (e.g., `openai.WithAPIKey`)
+- Interface compliance: add `var _ <Interface> = (*<Concrete>)(nil)` at file bottom
+
+## Documentation
+
+- Every exported type and function has a godoc comment.
+- Package comment is on the first file alphabetically or a dedicated `doc.go`.
+- Comments describe *what* and *why*, not *how*.
+
+## Error wrapping
+
+Always wrap errors with context:
+
+```go
+return nil, fmt.Errorf("step %d (%s): %w", i, name, err)
+```
+
+## Testing
+
+- Tests live in `*_test.go` alongside the source, same package (white-box).
+- Use table-driven tests with `t.Run` where appropriate.
+- Mock external services; never call real APIs in unit tests.
+- Integration tests requiring API keys use `//go:build integration`.

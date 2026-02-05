@@ -1,0 +1,43 @@
+---
+description: How to add a new LLM provider (e.g., Google, Cohere, Ollama)
+globs: providers/**/*.go
+alwaysApply: false
+---
+
+# Adding a New LLM Provider
+
+New providers live under `providers/<name>/` and must implement `llms.ChatModel`.
+
+## File structure
+
+```
+providers/<name>/
+  options.go   # Options struct, DefaultOptions(), OptionFunc type, With* helpers
+  chat.go      # ChatModel implementation (Invoke, Generate, Stream, Batch, BindTools, WithStructuredOutput)
+  embeddings.go  # (optional) Embedder implementation
+```
+
+## Required interface
+
+```go
+var _ llms.ChatModel = (*ChatModel)(nil)
+```
+
+The `llms.ChatModel` interface requires:
+- `Invoke(ctx, []core.Message, ...core.Option) (*core.AIMessage, error)`
+- `Stream(ctx, []core.Message, ...core.Option) (*core.StreamIterator[*core.AIMessage], error)`
+- `Batch(ctx, [][]core.Message, ...core.Option) ([]*core.AIMessage, error)`
+- `GetName() string`
+- `Generate(ctx, []core.Message, ...core.Option) (*llms.ChatResult, error)`
+- `BindTools(...llms.ToolDefinition) llms.ChatModel`
+- `WithStructuredOutput(map[string]any) llms.ChatModel`
+
+## Conventions
+
+- API key: read from option first, fall back to environment variable (e.g., `<NAME>_API_KEY`).
+- `BindTools` / `WithStructuredOutput` return a shallow copy with the new config. Never mutate the receiver.
+- Map `core.Message` types to the provider's wire format in a private `messageToAPI` method.
+- Parse responses in a private `parseResponse` method that returns `*llms.ChatResult`.
+- Streaming reads SSE lines in a goroutine, writing `core.StreamChunk` to a channel.
+- Set `core.AIMessage.ToolCalls` when the model returns tool calls.
+- Set `core.AIMessage.UsageMetadata` when token counts are available.

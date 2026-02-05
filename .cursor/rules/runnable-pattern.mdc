@@ -1,0 +1,76 @@
+---
+description: How to implement the Runnable interface when adding new components
+globs: "**/*.go"
+alwaysApply: false
+---
+
+# Implementing Runnable Components
+
+When adding a new LangChain component (model provider, parser, retriever, etc.),
+follow this exact pattern.
+
+## Required methods
+
+```go
+type MyComponent struct {
+    name string
+    // ... fields
+}
+
+func (c *MyComponent) GetName() string {
+    if c.name != "" { return c.name }
+    return "MyComponent"
+}
+
+func (c *MyComponent) Invoke(ctx context.Context, input I, opts ...core.Option) (O, error) {
+    // Core logic here
+}
+
+func (c *MyComponent) Stream(ctx context.Context, input I, opts ...core.Option) (*core.StreamIterator[O], error) {
+    // If true streaming is supported, write to a channel.
+    // Otherwise, wrap Invoke in a single-chunk stream:
+    result, err := c.Invoke(ctx, input, opts...)
+    if err != nil { return nil, err }
+    ch := make(chan core.StreamChunk[O], 1)
+    ch <- core.StreamChunk[O]{Value: result}
+    close(ch)
+    return core.NewStreamIterator(ch), nil
+}
+
+func (c *MyComponent) Batch(ctx context.Context, inputs []I, opts ...core.Option) ([]O, error) {
+    results := make([]O, len(inputs))
+    for i, input := range inputs {
+        result, err := c.Invoke(ctx, input, opts...)
+        if err != nil { return nil, fmt.Errorf("batch item %d: %w", i, err) }
+        results[i] = result
+    }
+    return results, nil
+}
+```
+
+## Interface check
+
+At the bottom of the file, add a compile-time interface check:
+
+```go
+var _ core.Runnable[InputType, OutputType] = (*MyComponent)(nil)
+```
+
+## Options handling
+
+Read config from `core.ApplyOptions(opts...)`. Check `cfg.Configurable` for
+runtime overrides (temperature, model name, etc.). Provider-specific constructors
+use their own `OptionFunc` type for build-time configuration.
+
+## Streaming producers
+
+When implementing true streaming (e.g., SSE from an API), use this pattern:
+
+```go
+ch := make(chan core.StreamChunk[O], 64)
+go func() {
+    defer close(ch)
+    // Write chunks to ch; send StreamChunk{Err: err} on failure
+}()
+return core.NewStreamIterator(ch), nil
+```

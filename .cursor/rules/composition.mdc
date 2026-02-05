@@ -1,0 +1,63 @@
+---
+description: How to compose runnables into chains (LCEL equivalent)
+globs: runnable/**/*.go, chains/**/*.go
+alwaysApply: false
+---
+
+# Composing Runnables (Go LCEL)
+
+Go has no operator overloading, so instead of Python's `prompt | model | parser`,
+we use typed composition functions.
+
+## Type-safe composition
+
+```go
+// 2 steps: A -> B -> C
+chain := runnable.Pipe2(promptRunnable, modelRunnable)
+
+// 3 steps: A -> B -> C -> D
+chain := runnable.Pipe3(prompt, model, parser)
+
+// 4 steps
+chain := runnable.Pipe4(step1, step2, step3, step4)
+```
+
+Generic type parameters are inferred. The compiler verifies that each step's
+output type matches the next step's input type.
+
+## Untyped composition
+
+For dynamic pipelines where types aren't known at compile time:
+
+```go
+chain := runnable.Pipe(r1, r2, r3) // all Runnable[any, any]
+```
+
+## Parallel (fan-out)
+
+```go
+parallel := runnable.NewParallel[string, string](map[string]core.Runnable[string, string]{
+    "context":  retriever,
+    "question": runnable.NewPassthrough[string](),
+})
+// Returns map[string]any with keys "context" and "question"
+```
+
+## Conditional (branch)
+
+```go
+branch := runnable.NewBranch(
+    []runnable.BranchCondition[string, string]{
+        {Condition: func(s string) bool { return len(s) > 100 }, Runnable: summarizer},
+    },
+    passthrough, // default
+)
+```
+
+## Lambda (wrap any function)
+
+```go
+upper := runnable.NewLambda(func(ctx context.Context, s string) (string, error) {
+    return strings.ToUpper(s), nil
+})
+```

@@ -1,0 +1,56 @@
+---
+description: How to create tools and integrate them with agents
+globs: tools/**/*.go, agents/**/*.go
+alwaysApply: false
+---
+
+# Adding Tools
+
+## Simple tool (string in, string out)
+
+```go
+myTool := tools.NewTool("name", "description",
+    func(ctx context.Context, input string) (string, error) {
+        return "result", nil
+    },
+)
+```
+
+## Typed tool (struct args with auto-schema)
+
+```go
+type Args struct {
+    Query string `json:"query" description:"The search query"`
+    Limit int    `json:"limit,omitempty" description:"Max results"`
+}
+
+myTool := tools.NewTypedTool("search", "Search the web", Args{},
+    func(ctx context.Context, args Args) (string, error) {
+        return fmt.Sprintf("Results for: %s", args.Query), nil
+    },
+)
+```
+
+The `description` struct tag is read by `generateJSONSchema` and included in the
+tool's parameter schema sent to the LLM.
+
+## Tool interface contract
+
+All tools implement:
+
+```go
+type Tool interface {
+    Name() string
+    Description() string
+    ArgsSchema() map[string]any  // JSON Schema
+    Run(ctx context.Context, input string) (string, error)
+}
+```
+
+`Run` always receives a JSON string as input. For typed tools, the JSON is
+automatically unmarshalled into the args struct.
+
+## Binding tools to models
+
+Use `tools.ToDefinitions(...)` to convert `[]tools.Tool` to `[]llms.ToolDefinition`,
+then call `model.BindTools(defs...)`. The `ToolCallingAgent` does this automatically.
