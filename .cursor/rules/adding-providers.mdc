@@ -41,3 +41,8 @@ The `llms.ChatModel` interface requires:
 - Streaming reads SSE lines in a goroutine, writing `core.StreamChunk` to a channel.
 - Set `core.AIMessage.ToolCalls` when the model returns tool calls.
 - Set `core.AIMessage.UsageMetadata` when token counts are available.
+
+## File creation
+
+- When creating new `.go` files (or any source files), always write the full content with proper newlines between lines. Never collapse or inline multiple statements onto a single line.
+- After creating a file, verify it compiles (`go build`) before moving on. If the build fails with a syntax error, re-read the file to check for corrupted formatting (e.g., all lines merged into one) and recreate it if necessary.
