@@ -29,6 +29,10 @@ type ConversationBufferMemory struct {
 
 	// AIPrefix is the prefix for AI messages in string output.
 	AIPrefix string
+
+	// MaxMessages is the maximum number of messages to retain in history.
+	// 0 means unlimited. When exceeded, the oldest messages are dropped.
+	MaxMessages int
 }
 
 // NewConversationBufferMemory creates a new ConversationBufferMemory.
@@ -73,6 +77,12 @@ func (m *ConversationBufferMemory) SaveContext(ctx context.Context, inputs map[s
 	outputVal, ok := outputs[m.OutputKey]
 	if ok {
 		m.ChatHistory.AddAIMessage(ctx, toString(outputVal))
+	}
+	if m.MaxMessages > 0 {
+		msgs := m.ChatHistory.GetMessages(ctx)
+		if len(msgs) > m.MaxMessages {
+			m.ChatHistory.SetMessages(ctx, msgs[len(msgs)-m.MaxMessages:])
+		}
 	}
 	return nil
 }

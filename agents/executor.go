@@ -36,6 +36,10 @@ type AgentExecutor struct {
 
 // NewAgentExecutor creates a new AgentExecutor.
 func NewAgentExecutor(agent Agent, agentTools []tools.Tool, options ...ExecutorOption) *AgentExecutor {
+	if agent == nil {
+		panic("NewAgentExecutor: agent must not be nil")
+	}
+
 	toolMap := make(map[string]tools.Tool)
 	for _, t := range agentTools {
 		toolMap[t.Name()] = t

@@ -4,6 +4,7 @@ package chains
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/LucaLanziani/langchain-go/core"
@@ -35,16 +36,30 @@ func (c *LLMChain) GetName() string {
 
 // Invoke runs the chain.
 func (c *LLMChain) Invoke(ctx context.Context, input map[string]any, opts ...core.Option) (string, error) {
+	cfg := core.ApplyOptions(opts...)
+	for _, cb := range cfg.Callbacks {
+		cb.OnChainStart(ctx, input, cfg.RunID, "", map[string]any{"name": c.GetName()})
+	}
+
 	messages, err := c.prompt.FormatMessages(input)
 	if err != nil {
+		for _, cb := range cfg.Callbacks {
+			cb.OnChainError(ctx, err, cfg.RunID)
+		}
 		return "", fmt.Errorf("prompt format error: %w", err)
 	}
 
 	response, err := c.llm.Invoke(ctx, messages, opts...)
 	if err != nil {
+		for _, cb := range cfg.Callbacks {
+			cb.OnChainError(ctx, err, cfg.RunID)
+		}
 		return "", fmt.Errorf("LLM error: %w", err)
 	}
 
+	for _, cb := range cfg.Callbacks {
+		cb.OnChainEnd(ctx, map[string]any{"output": response.Content}, cfg.RunID)
+	}
 	return response.Content, nil
 }
 
@@ -123,42 +138,62 @@ func (c *StuffDocumentsChain) GetName() string {
 
 // Invoke runs the chain with documents.
 func (c *StuffDocumentsChain) Invoke(ctx context.Context, input map[string]any, opts ...core.Option) (string, error) {
-	docsRaw, ok := input[c.inputKey]
-	if !ok {
-		return "", fmt.Errorf("missing input key %q", c.inputKey)
-	}
-	docs, ok := docsRaw.([]*core.Document)
-	if !ok {
-		return "", fmt.Errorf("input key %q must be []*core.Document", c.inputKey)
+	cfg := core.ApplyOptions(opts...)
+	for _, cb := range cfg.Callbacks {
+		cb.OnChainStart(ctx, input, cfg.RunID, "", map[string]any{"name": c.GetName()})
 	}
 
-	// Combine document contents.
-	var contents []string
-	for _, doc := range docs {
-		contents = append(contents, doc.PageContent)
+	mergedInput, err := c.stuffDocuments(input)
+	if err != nil {
+		for _, cb := range cfg.Callbacks {
+			cb.OnChainError(ctx, err, cfg.RunID)
+		}
+		return "", err
 	}
-	combinedContext := strings.Join(contents, c.separator)
 
-	// Pass to LLM chain.
-	mergedInput := make(map[string]any)
-	for k, v := range input {
-		mergedInput[k] = v
+	result, err := c.llmChain.Invoke(ctx, mergedInput, opts...)
+	if err != nil {
+		for _, cb := range cfg.Callbacks {
+			cb.OnChainError(ctx, err, cfg.RunID)
+		}
+		return "", err
 	}
-	mergedInput[c.documentKey] = combinedContext
 
-	return c.llmChain.Invoke(ctx, mergedInput, opts...)
+	for _, cb := range cfg.Callbacks {
+		cb.OnChainEnd(ctx, map[string]any{"output": result}, cfg.RunID)
+	}
+	return result, nil
 }
 
 // Stream streams the chain output.
 func (c *StuffDocumentsChain) Stream(ctx context.Context, input map[string]any, opts ...core.Option) (*core.StreamIterator[string], error) {
-	result, err := c.Invoke(ctx, input, opts...)
+	mergedInput, err := c.stuffDocuments(input)
 	if err != nil {
 		return nil, err
 	}
-	ch := make(chan core.StreamChunk[string], 1)
-	ch <- core.StreamChunk[string]{Value: result}
-	close(ch)
-	return core.NewStreamIterator(ch), nil
+	return c.llmChain.Stream(ctx, mergedInput, opts...)
+}
+
+// stuffDocuments extracts and combines documents into a merged input map.
+func (c *StuffDocumentsChain) stuffDocuments(input map[string]any) (map[string]any, error) {
+	docsRaw, ok := input[c.inputKey]
+	if !ok {
+		return nil, fmt.Errorf("missing input key %q", c.inputKey)
+	}
+	docs, ok := docsRaw.([]*core.Document)
+	if !ok {
+		return nil, fmt.Errorf("input key %q must be []*core.Document", c.inputKey)
+	}
+
+	var contents []string
+	for _, doc := range docs {
+		contents = append(contents, doc.PageContent)
+	}
+
+	mergedInput := make(map[string]any, len(input)+1)
+	maps.Copy(mergedInput, input)
+	mergedInput[c.documentKey] = strings.Join(contents, c.separator)
+	return mergedInput, nil
 }
 
 // Batch runs the chain for multiple inputs.
@@ -202,30 +237,58 @@ func (r *RetrievalQA) GetName() string {
 
 // Invoke retrieves documents and answers the query.
 func (r *RetrievalQA) Invoke(ctx context.Context, input map[string]any, opts ...core.Option) (string, error) {
+	cfg := core.ApplyOptions(opts...)
+	for _, cb := range cfg.Callbacks {
+		cb.OnChainStart(ctx, input, cfg.RunID, "", map[string]any{"name": r.GetName()})
+	}
+
+	augmented, err := r.retrieveAndAugment(ctx, input)
+	if err != nil {
+		for _, cb := range cfg.Callbacks {
+			cb.OnChainError(ctx, err, cfg.RunID)
+		}
+		return "", err
+	}
+
+	result, err := r.chain.Invoke(ctx, augmented, opts...)
+	if err != nil {
+		for _, cb := range cfg.Callbacks {
+			cb.OnChainError(ctx, err, cfg.RunID)
+		}
+		return "", err
+	}
+
+	for _, cb := range cfg.Callbacks {
+		cb.OnChainEnd(ctx, map[string]any{"output": result}, cfg.RunID)
+	}
+	return result, nil
+}
+
+// Stream retrieves documents then streams the LLM response.
+func (r *RetrievalQA) Stream(ctx context.Context, input map[string]any, opts ...core.Option) (*core.StreamIterator[string], error) {
+	augmented, err := r.retrieveAndAugment(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return r.chain.Stream(ctx, augmented, opts...)
+}
+
+// retrieveAndAugment fetches relevant documents and returns a copy of input with them added.
+func (r *RetrievalQA) retrieveAndAugment(ctx context.Context, input map[string]any) (map[string]any, error) {
 	query, ok := input[r.queryKey]
 	if !ok {
-		return "", fmt.Errorf("missing input key %q", r.queryKey)
+		return nil, fmt.Errorf("missing input key %q", r.queryKey)
 	}
 
 	docs, err := r.retriever.GetRelevantDocuments(ctx, fmt.Sprintf("%v", query))
 	if err != nil {
-		return "", fmt.Errorf("retrieval error: %w", err)
+		return nil, fmt.Errorf("retrieval error: %w", err)
 	}
 
-	input["input_documents"] = docs
-	return r.chain.Invoke(ctx, input, opts...)
-}
-
-// Stream streams the chain output.
-func (r *RetrievalQA) Stream(ctx context.Context, input map[string]any, opts ...core.Option) (*core.StreamIterator[string], error) {
-	result, err := r.Invoke(ctx, input, opts...)
-	if err != nil {
-		return nil, err
-	}
-	ch := make(chan core.StreamChunk[string], 1)
-	ch <- core.StreamChunk[string]{Value: result}
-	close(ch)
-	return core.NewStreamIterator(ch), nil
+	augmented := make(map[string]any, len(input)+1)
+	maps.Copy(augmented, input)
+	augmented["input_documents"] = docs
+	return augmented, nil
 }
 
 // Batch runs the chain for multiple inputs.

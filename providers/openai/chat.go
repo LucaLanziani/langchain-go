@@ -139,7 +139,9 @@ func (m *ChatModel) Batch(ctx context.Context, inputs [][]core.Message, opts ...
 func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConfig, stream bool) map[string]any {
 	model := m.opts.Model
 	if v, ok := cfg.Configurable[llms.ConfigKeyModel]; ok {
-		model = v.(string)
+		if s, ok := v.(string); ok {
+			model = s
+		}
 	}
 
 	apiMessages := make([]map[string]any, 0, len(messages))

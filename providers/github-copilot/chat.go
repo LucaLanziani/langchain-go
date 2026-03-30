@@ -111,7 +111,7 @@ func (m *ChatModel) Invoke(ctx context.Context, input []core.Message, opts ...co
 func (m *ChatModel) Generate(ctx context.Context, messages []core.Message, opts ...core.Option) (*llms.ChatResult, error) {
 	cfg := core.ApplyOptions(opts...)
 
-	sessionCfg := m.buildSessionConfig(messages, cfg)
+	sessionCfg := m.buildSessionConfig(ctx, messages, cfg)
 	session, err := m.client.CreateSession(ctx, sessionCfg)
 	if err != nil {
 		return nil, fmt.Errorf("copilot: failed to create session: %w", err)
@@ -133,7 +133,7 @@ func (m *ChatModel) Generate(ctx context.Context, messages []core.Message, opts 
 func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...core.Option) (*core.StreamIterator[*core.AIMessage], error) {
 	cfg := core.ApplyOptions(opts...)
 
-	sessionCfg := m.buildSessionConfig(input, cfg)
+	sessionCfg := m.buildSessionConfig(ctx, input, cfg)
 	sessionCfg.Streaming = true
 
 	session, err := m.client.CreateSession(ctx, sessionCfg)
@@ -252,10 +252,12 @@ func (m *ChatModel) Batch(ctx context.Context, inputs [][]core.Message, opts ...
 }
 
 // buildSessionConfig constructs the SDK SessionConfig from options and runtime config.
-func (m *ChatModel) buildSessionConfig(messages []core.Message, cfg *core.RunnableConfig) *copilot.SessionConfig {
+func (m *ChatModel) buildSessionConfig(ctx context.Context, messages []core.Message, cfg *core.RunnableConfig) *copilot.SessionConfig {
 	model := m.opts.Model
 	if v, ok := cfg.Configurable[llms.ConfigKeyModel]; ok {
-		model = v.(string)
+		if s, ok := v.(string); ok {
+			model = s
+		}
 	}
 
 	sessionCfg := &copilot.SessionConfig{
@@ -297,7 +299,7 @@ func (m *ChatModel) buildSessionConfig(messages []core.Message, cfg *core.Runnab
 	}
 
 	// Bridge langchain tools to SDK tools.
-	sdkTools := bridgeTools(m.opts.Tools)
+	sdkTools := bridgeTools(ctx, m.opts.Tools)
 
 	// Also add any bound tool definitions as SDK tools (without handlers, so the SDK
 	// will report them but won't auto-execute).
@@ -318,7 +320,7 @@ func (m *ChatModel) buildSessionConfig(messages []core.Message, cfg *core.Runnab
 
 // bridgeTools converts langchain Tool implementations to copilot.Tool structs
 // with real handlers, so the SDK manages the tool-calling loop internally.
-func bridgeTools(langchainTools []tools.Tool) []copilot.Tool {
+func bridgeTools(ctx context.Context, langchainTools []tools.Tool) []copilot.Tool {
 	if len(langchainTools) == 0 {
 		return nil
 	}
@@ -347,7 +349,7 @@ func bridgeTools(langchainTools []tools.Tool) []copilot.Tool {
 					argsStr = string(b)
 				}
 
-				result, err := tool.Run(context.Background(), argsStr)
+				result, err := tool.Run(ctx, argsStr)
 				if err != nil {
 					return copilot.ToolResult{
 						TextResultForLLM: fmt.Sprintf("Error: %v", err),

@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -170,10 +172,12 @@ func (h *LangSmithHandler) postRun(run *langSmithRun) {
 	}
 	data, err := json.Marshal(run)
 	if err != nil {
+		log.Printf("langsmith: failed to marshal run %s: %v", run.ID, err)
 		return
 	}
 	req, err := http.NewRequest(http.MethodPost, h.endpoint+"/runs", bytes.NewReader(data))
 	if err != nil {
+		log.Printf("langsmith: failed to create request for run %s: %v", run.ID, err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -181,9 +185,14 @@ func (h *LangSmithHandler) postRun(run *langSmithRun) {
 
 	resp, err := h.client.Do(req)
 	if err != nil {
+		log.Printf("langsmith: failed to post run %s: %v", run.ID, err)
 		return
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("langsmith: API error posting run %s (status %d): %s", run.ID, resp.StatusCode, body)
+	}
 }
 
 func (h *LangSmithHandler) patchRun(run *langSmithRun) {
@@ -199,10 +208,12 @@ func (h *LangSmithHandler) patchRun(run *langSmithRun) {
 	}
 	data, err := json.Marshal(patchData)
 	if err != nil {
+		log.Printf("langsmith: failed to marshal patch for run %s: %v", run.ID, err)
 		return
 	}
 	req, err := http.NewRequest(http.MethodPatch, h.endpoint+"/runs/"+run.ID, bytes.NewReader(data))
 	if err != nil {
+		log.Printf("langsmith: failed to create patch request for run %s: %v", run.ID, err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -210,7 +221,12 @@ func (h *LangSmithHandler) patchRun(run *langSmithRun) {
 
 	resp, err := h.client.Do(req)
 	if err != nil {
+		log.Printf("langsmith: failed to patch run %s: %v", run.ID, err)
 		return
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("langsmith: API error patching run %s (status %d): %s", run.ID, resp.StatusCode, body)
+	}
 }

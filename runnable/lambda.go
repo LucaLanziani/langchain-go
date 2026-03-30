@@ -34,7 +34,21 @@ func (l *Lambda[I, O]) GetName() string {
 
 // Invoke runs the wrapped function.
 func (l *Lambda[I, O]) Invoke(ctx context.Context, input I, opts ...core.Option) (O, error) {
-	return l.fn(ctx, input)
+	cfg := core.ApplyOptions(opts...)
+	for _, cb := range cfg.Callbacks {
+		cb.OnChainStart(ctx, map[string]any{}, cfg.RunID, "", map[string]any{"name": l.GetName()})
+	}
+	result, err := l.fn(ctx, input)
+	if err != nil {
+		for _, cb := range cfg.Callbacks {
+			cb.OnChainError(ctx, err, cfg.RunID)
+		}
+		return result, err
+	}
+	for _, cb := range cfg.Callbacks {
+		cb.OnChainEnd(ctx, map[string]any{}, cfg.RunID)
+	}
+	return result, nil
 }
 
 // Stream returns a single-chunk stream of the function result.

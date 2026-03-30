@@ -49,6 +49,14 @@ func (h *ChatMessageHistory) GetMessages(_ context.Context) []core.Message {
 	return result
 }
 
+// SetMessages replaces the entire message history.
+func (h *ChatMessageHistory) SetMessages(_ context.Context, msgs []core.Message) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.messages = make([]core.Message, len(msgs))
+	copy(h.messages, msgs)
+}
+
 // Clear removes all messages from the history.
 func (h *ChatMessageHistory) Clear(_ context.Context) {
 	h.mu.Lock()
