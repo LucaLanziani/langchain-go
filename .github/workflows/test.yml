@@ -23,6 +23,16 @@ jobs:
       - name: Run tests
         run: go test ./... -coverprofile=coverage.out -covermode=atomic
 
+      - name: Generate HTML coverage report
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.html
+          retention-days: 30
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
