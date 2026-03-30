@@ -93,3 +93,17 @@ var ErrTest = &testError{}
 type testError struct{}
 
 func (e *testError) Error() string { return "test error" }
+
+func TestStreamIteratorCollectError(t *testing.T) {
+	ch := make(chan StreamChunk[int], 3)
+	ch <- StreamChunk[int]{Value: 1}
+	ch <- StreamChunk[int]{Err: ErrTest}
+	ch <- StreamChunk[int]{Value: 3}
+	close(ch)
+
+	iter := NewStreamIterator(ch)
+	_, err := iter.Collect()
+	if err != ErrTest {
+		t.Errorf("expected ErrTest, got %v", err)
+	}
+}

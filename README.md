@@ -1,5 +1,8 @@
 # langchain-go
 
+[![Tests](https://github.com/LucaLanziani/langchain-go/actions/workflows/test.yml/badge.svg)](https://github.com/LucaLanziani/langchain-go/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/LucaLanziani/langchain-go/branch/main/graph/badge.svg)](https://codecov.io/gh/LucaLanziani/langchain-go)
+
 **LangChain for Go** -- build production-grade AI agents as single, high-performance binaries.
 
 langchain-go brings the battle-tested LangChain framework natively to Go, giving you

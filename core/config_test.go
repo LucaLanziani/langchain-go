@@ -70,3 +70,33 @@ func TestMergeOptions(t *testing.T) {
 		t.Errorf("expected MaxConcurrency 3, got %d", merged.MaxConcurrency)
 	}
 }
+
+func TestMergeOptionsNilBase(t *testing.T) {
+	merged := MergeOptions(nil, WithRunName("test"))
+	if merged.RunName != "test" {
+		t.Errorf("expected RunName 'test', got %q", merged.RunName)
+	}
+}
+
+func TestWithCallbacks(t *testing.T) {
+	h := &BaseCallbackHandler{}
+	cfg := ApplyOptions(WithCallbacks(h))
+	if len(cfg.Callbacks) != 1 {
+		t.Errorf("expected 1 callback, got %d", len(cfg.Callbacks))
+	}
+}
+
+func TestWithRunID(t *testing.T) {
+	cfg := ApplyOptions(WithRunID("my-run-id"))
+	if cfg.RunID != "my-run-id" {
+		t.Errorf("expected RunID 'my-run-id', got %q", cfg.RunID)
+	}
+}
+
+func TestWithMetadataNilMap(t *testing.T) {
+	base := &RunnableConfig{} // nil Metadata
+	merged := MergeOptions(base, WithMetadata(map[string]any{"key": "val"}))
+	if merged.Metadata["key"] != "val" {
+		t.Errorf("expected metadata key=val, got %v", merged.Metadata["key"])
+	}
+}

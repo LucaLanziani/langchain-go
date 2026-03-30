@@ -68,3 +68,32 @@ func TestStringOutputParserGetName(t *testing.T) {
 		t.Errorf("expected 'Custom', got %q", parser.GetName())
 	}
 }
+
+func TestStringOutputParserStream(t *testing.T) {
+	parser := NewStringOutputParser()
+	msg := core.NewAIMessage("streamed content")
+
+	iter, err := parser.Stream(context.Background(), msg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	chunk, ok, err := iter.Next()
+	if err != nil {
+		t.Fatalf("unexpected iter error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected a chunk")
+	}
+	if chunk != "streamed content" {
+		t.Errorf("unexpected chunk: %q", chunk)
+	}
+
+	_, ok, err = iter.Next()
+	if err != nil {
+		t.Fatalf("unexpected error on second Next: %v", err)
+	}
+	if ok {
+		t.Error("expected stream to be done")
+	}
+}

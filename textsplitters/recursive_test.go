@@ -67,3 +67,60 @@ func TestSplitDocuments(t *testing.T) {
 		}
 	}
 }
+
+func TestWithSeparators(t *testing.T) {
+	splitter := NewRecursiveCharacterTextSplitter(20, 0)
+	splitter = splitter.WithSeparators([]string{"|", ""})
+	if len(splitter.Separators) != 2 || splitter.Separators[0] != "|" {
+		t.Errorf("expected custom separators, got %v", splitter.Separators)
+	}
+	text := "part1|part2|part3"
+	chunks := splitter.SplitText(text)
+	if len(chunks) == 0 {
+		t.Fatal("expected chunks with custom separator")
+	}
+}
+
+func TestSplitTextCharacterFallback(t *testing.T) {
+	// Force character-by-character split by using tiny chunk size.
+	splitter := NewRecursiveCharacterTextSplitter(1, 0)
+	chunks := splitter.SplitText("abc")
+	if len(chunks) == 0 {
+		t.Fatal("expected split characters")
+	}
+}
+
+func TestSplitDocumentsNilMetadata(t *testing.T) {
+	splitter := NewRecursiveCharacterTextSplitter(1000, 0)
+	docs := []*core.Document{
+		{PageContent: "doc with no metadata"},
+	}
+	result := splitter.SplitDocuments(docs)
+	if len(result) != 1 {
+		t.Errorf("expected 1 chunk, got %d", len(result))
+	}
+	if result[0].Metadata != nil {
+		t.Error("expected nil metadata to remain nil")
+	}
+}
+
+func TestMergeSplitsOverlap(t *testing.T) {
+	splitter := NewRecursiveCharacterTextSplitter(15, 5)
+	// Text with multiple newline-separated pieces to trigger overlap logic.
+	text := "aaa\nbbb\nccc\nddd\neee\nfff"
+	chunks := splitter.SplitText(text)
+	if len(chunks) == 0 {
+		t.Fatal("expected at least one chunk")
+	}
+}
+
+func TestMergeSplitsWhitespaceChunk(t *testing.T) {
+	// Trigger the whitespace trim path in mergeSplits.
+	splitter := NewRecursiveCharacterTextSplitter(5, 0)
+	splitter.Separators = []string{"\n", ""}
+	// Text with a pure-whitespace line between content.
+	text := "abc\n   \ndef"
+	chunks := splitter.SplitText(text)
+	// Just ensure no panic and at least one chunk.
+	_ = chunks
+}

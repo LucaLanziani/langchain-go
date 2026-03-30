@@ -148,3 +148,88 @@ func TestConversationWindowMemoryClear(t *testing.T) {
 		t.Errorf("expected 0 messages after clear, got %d", len(messages))
 	}
 }
+
+func TestConversationBufferMemoryClear(t *testing.T) {
+	ctx := context.Background()
+	mem := NewConversationBufferMemory()
+	_ = mem.SaveContext(ctx, map[string]any{"input": "hi"}, map[string]any{"output": "hello"})
+	if err := mem.Clear(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	vars, _ := mem.LoadMemoryVariables(ctx, nil)
+	if vars["history"].(string) != "" {
+		t.Error("expected empty history after clear")
+	}
+}
+
+func TestConversationBufferMemoryMaxMessages(t *testing.T) {
+	ctx := context.Background()
+	mem := NewConversationBufferMemory()
+	mem.MaxMessages = 4 // Keep only last 4 messages (2 turns).
+
+	for i := 0; i < 4; i++ {
+		_ = mem.SaveContext(ctx, map[string]any{"input": "q"}, map[string]any{"output": "a"})
+	}
+
+	mem.ReturnMessages = true
+	vars, _ := mem.LoadMemoryVariables(ctx, nil)
+	msgs := vars["history"].([]core.Message)
+	if len(msgs) != 4 {
+		t.Errorf("expected 4 messages (limited), got %d", len(msgs))
+	}
+}
+
+func TestConversationBufferMemoryNonStringInput(t *testing.T) {
+	ctx := context.Background()
+	mem := NewConversationBufferMemory()
+	// Non-string values — should not blow up.
+	_ = mem.SaveContext(ctx, map[string]any{"input": 123}, map[string]any{"output": 456})
+	vars, _ := mem.LoadMemoryVariables(ctx, nil)
+	// toString() returns "" for non-string, so history string should not crash.
+	_ = vars
+}
+
+func TestChatMessageHistoryAddMessage(t *testing.T) {
+	ctx := context.Background()
+	h := NewChatMessageHistory()
+	h.AddMessage(ctx, core.NewHumanMessage("msg via AddMessage"))
+	msgs := h.GetMessages(ctx)
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+}
+
+func TestChatMessageHistorySetMessages(t *testing.T) {
+	ctx := context.Background()
+	h := NewChatMessageHistory()
+	h.AddUserMessage(ctx, "original")
+	h.SetMessages(ctx, []core.Message{core.NewAIMessage("replaced")})
+	msgs := h.GetMessages(ctx)
+	if len(msgs) != 1 || msgs[0].GetType() != core.MessageTypeAI {
+		t.Errorf("expected replaced AI message, got %v", msgs)
+	}
+}
+
+func TestConversationWindowMemoryStringOutput(t *testing.T) {
+	ctx := context.Background()
+	mem := NewConversationWindowMemory(2)
+	mem.ReturnMessages = false
+	_ = mem.SaveContext(ctx, map[string]any{"input": "hello"}, map[string]any{"output": "hi"})
+
+	vars, err := mem.LoadMemoryVariables(ctx, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	hist, ok := vars["history"].(string)
+	if !ok || hist == "" {
+		t.Errorf("expected non-empty string history, got %T", vars["history"])
+	}
+}
+
+func TestConversationWindowMemoryVariables(t *testing.T) {
+	mem := NewConversationWindowMemory(5)
+	keys := mem.MemoryVariables()
+	if len(keys) != 1 || keys[0] != "history" {
+		t.Errorf("expected [history], got %v", keys)
+	}
+}

@@ -2,6 +2,7 @@ package runnable
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -42,5 +43,35 @@ func TestLambdaGetName(t *testing.T) {
 	l.WithName("MyLambda")
 	if l.GetName() != "MyLambda" {
 		t.Errorf("expected 'MyLambda', got %q", l.GetName())
+	}
+}
+
+func TestLambdaStream(t *testing.T) {
+	upper := NewLambda(func(_ context.Context, s string) (string, error) {
+		return strings.ToUpper(s), nil
+	})
+	iter, err := upper.Stream(context.Background(), "hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result, ok, err := iter.Next()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected a chunk")
+	}
+	if result != "HELLO" {
+		t.Errorf("expected 'HELLO', got %q", result)
+	}
+}
+
+func TestLambdaInvokeError(t *testing.T) {
+	failing := NewLambda(func(_ context.Context, _ string) (string, error) {
+		return "", errors.New("lambda error")
+	})
+	_, err := failing.Invoke(context.Background(), "input")
+	if err == nil || err.Error() != "lambda error" {
+		t.Errorf("expected 'lambda error', got %v", err)
 	}
 }

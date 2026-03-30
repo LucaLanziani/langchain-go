@@ -96,3 +96,47 @@ func TestPromptTemplateGetName(t *testing.T) {
 		t.Errorf("expected 'MyTemplate', got %q", tmpl.GetName())
 	}
 }
+
+func TestPromptTemplateStream(t *testing.T) {
+	tmpl := NewPromptTemplate("Hello {name}!")
+
+	iter, err := tmpl.Stream(context.Background(), map[string]any{"name": "World"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	chunk, ok, err := iter.Next()
+	if err != nil {
+		t.Fatalf("unexpected error from Next: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected a chunk")
+	}
+	if chunk != "Hello World!" {
+		t.Errorf("unexpected chunk: %q", chunk)
+	}
+
+	_, ok, err = iter.Next()
+	if err != nil {
+		t.Fatalf("unexpected error on second Next: %v", err)
+	}
+	if ok {
+		t.Error("expected stream to be done")
+	}
+}
+
+func TestPromptTemplateStreamError(t *testing.T) {
+	tmpl := NewPromptTemplate("{missing}")
+	_, err := tmpl.Stream(context.Background(), map[string]any{})
+	if err == nil {
+		t.Error("expected error for missing variable in stream")
+	}
+}
+
+func TestPromptTemplateBatchError(t *testing.T) {
+	tmpl := NewPromptTemplate("Hello {name}!")
+	_, err := tmpl.Batch(context.Background(), []map[string]any{{}})
+	if err == nil {
+		t.Error("expected error for missing variable in batch")
+	}
+}

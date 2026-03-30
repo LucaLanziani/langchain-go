@@ -105,3 +105,143 @@ func TestFromMessages(t *testing.T) {
 		t.Errorf("expected 2 messages, got %d", len(prompt.Messages))
 	}
 }
+
+func TestChatPromptTemplateWithName(t *testing.T) {
+	prompt := NewChatPromptTemplate(Human("hi"))
+	if prompt.GetName() != "ChatPromptTemplate" {
+		t.Errorf("expected default name 'ChatPromptTemplate', got %q", prompt.GetName())
+	}
+	prompt.WithName("MyPrompt")
+	if prompt.GetName() != "MyPrompt" {
+		t.Errorf("expected 'MyPrompt', got %q", prompt.GetName())
+	}
+}
+
+func TestChatPromptTemplateWithPartialVariables(t *testing.T) {
+	prompt := NewChatPromptTemplate(Human("{greeting}, {name}!"))
+	prompt.WithPartialVariables(map[string]any{"greeting": "Hello"})
+
+	msgs, err := prompt.FormatMessages(map[string]any{"name": "World"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(msgs) != 1 || msgs[0].GetContent() != "Hello, World!" {
+		t.Errorf("unexpected content: %q", msgs[0].GetContent())
+	}
+}
+
+func TestChatPromptTemplateAIMessage(t *testing.T) {
+	prompt := NewChatPromptTemplate(AI("I am {bot}"))
+
+	msgs, err := prompt.FormatMessages(map[string]any{"bot": "Copilot"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0].GetType() != core.MessageTypeAI {
+		t.Errorf("expected AI message type, got %s", msgs[0].GetType())
+	}
+	if msgs[0].GetContent() != "I am Copilot" {
+		t.Errorf("unexpected content: %q", msgs[0].GetContent())
+	}
+}
+
+func TestChatPromptTemplatePlaceholderInvalidType(t *testing.T) {
+	prompt := NewChatPromptTemplate(Placeholder("history"))
+	_, err := prompt.FormatMessages(map[string]any{"history": "not a slice"})
+	if err == nil {
+		t.Error("expected error for invalid placeholder type")
+	}
+}
+
+func TestChatPromptTemplateGenericRole(t *testing.T) {
+	prompt := NewChatPromptTemplate(MessageTemplate{Role: "tool", Template: "result: {output}"})
+
+	msgs, err := prompt.FormatMessages(map[string]any{"output": "done"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0].GetContent() != "result: done" {
+		t.Errorf("unexpected content: %q", msgs[0].GetContent())
+	}
+}
+
+func TestMessagesPlaceholderFunc(t *testing.T) {
+	mt := MessagesPlaceholder("history")
+	if mt.Role != "placeholder" {
+		t.Errorf("expected role 'placeholder', got %q", mt.Role)
+	}
+	if mt.Template != "history" {
+		t.Errorf("expected template 'history', got %q", mt.Template)
+	}
+}
+
+func TestChatPromptTemplateStream(t *testing.T) {
+	prompt := NewChatPromptTemplate(Human("{msg}"))
+
+	iter, err := prompt.Stream(context.Background(), map[string]any{"msg": "hello"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	chunk, ok, err := iter.Next()
+	if err != nil {
+		t.Fatalf("unexpected error from Next: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected a chunk")
+	}
+	if len(chunk) != 1 || chunk[0].GetContent() != "hello" {
+		t.Errorf("unexpected chunk: %v", chunk)
+	}
+
+	_, ok, err = iter.Next()
+	if err != nil {
+		t.Fatalf("unexpected error on second Next: %v", err)
+	}
+	if ok {
+		t.Error("expected stream to be done")
+	}
+}
+
+func TestChatPromptTemplateStreamError(t *testing.T) {
+	prompt := NewChatPromptTemplate(Placeholder("history"))
+	_, err := prompt.Stream(context.Background(), map[string]any{"history": "not-a-slice"})
+	if err == nil {
+		t.Error("expected error for invalid placeholder type in stream")
+	}
+}
+
+func TestChatPromptTemplateBatch(t *testing.T) {
+	prompt := NewChatPromptTemplate(Human("{item}"))
+
+	results, err := prompt.Batch(context.Background(), []map[string]any{
+		{"item": "first"},
+		{"item": "second"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if results[0][0].GetContent() != "first" {
+		t.Errorf("unexpected result[0]: %q", results[0][0].GetContent())
+	}
+	if results[1][0].GetContent() != "second" {
+		t.Errorf("unexpected result[1]: %q", results[1][0].GetContent())
+	}
+}
+
+func TestChatPromptTemplateBatchError(t *testing.T) {
+	prompt := NewChatPromptTemplate(Placeholder("history"))
+	_, err := prompt.Batch(context.Background(), []map[string]any{{"history": 42}})
+	if err == nil {
+		t.Error("expected error for batch with invalid placeholder type")
+	}
+}

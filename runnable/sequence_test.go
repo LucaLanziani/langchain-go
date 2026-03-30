@@ -119,3 +119,73 @@ func TestSequenceGetName(t *testing.T) {
 		t.Errorf("expected 'MyChain', got %q", chain.GetName())
 	}
 }
+
+func TestPipe4(t *testing.T) {
+	add1 := &mockRunnable[int, int]{fn: func(_ context.Context, i int) (int, error) { return i + 1, nil }, name: "add1"}
+	double := &mockRunnable[int, int]{fn: func(_ context.Context, i int) (int, error) { return i * 2, nil }, name: "double"}
+	sub3 := &mockRunnable[int, int]{fn: func(_ context.Context, i int) (int, error) { return i - 3, nil }, name: "sub3"}
+	toString := &mockRunnable[int, string]{fn: func(_ context.Context, i int) (string, error) { return fmt.Sprintf("%d", i), nil }, name: "s"}
+
+	chain := Pipe4(add1, double, sub3, toString)
+	// (2+1)*2 -3 = 3
+	result, err := chain.Invoke(context.Background(), 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "3" {
+		t.Errorf("expected '3', got %q", result)
+	}
+}
+
+func TestPipe(t *testing.T) {
+	add1 := &mockRunnable[any, any]{fn: func(_ context.Context, i any) (any, error) { return i.(int) + 1, nil }, name: "add1"}
+	double := &mockRunnable[any, any]{fn: func(_ context.Context, i any) (any, error) { return i.(int) * 2, nil }, name: "double"}
+
+	chain := Pipe(add1, double)
+	// (5+1)*2 = 12
+	result, err := chain.Invoke(context.Background(), 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.(int) != 12 {
+		t.Errorf("expected 12, got %v", result)
+	}
+}
+
+func TestSequenceStream(t *testing.T) {
+	double := &mockRunnable[int, int]{fn: func(_ context.Context, i int) (int, error) { return i * 2, nil }, name: "double"}
+	toString := &mockRunnable[int, string]{fn: func(_ context.Context, i int) (string, error) { return fmt.Sprintf("%d", i), nil }, name: "s"}
+
+	chain := Pipe2(double, toString)
+	iter, err := chain.Stream(context.Background(), 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	chunk, ok, err := iter.Next()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected a chunk")
+	}
+	if chunk != "6" {
+		t.Errorf("expected '6', got %q", chunk)
+	}
+}
+
+func TestSequenceTypeMismatch(t *testing.T) {
+	// Step produces int but sequence expects output as string.
+	r := &mockRunnable[int, int]{fn: func(_ context.Context, i int) (int, error) { return i, nil }, name: "r"}
+	// Build a sequence where the final type assertion will fail at runtime.
+	chain := &Sequence[int, string]{
+		steps: []step{
+			{name: "r", invoke: func(ctx context.Context, input any, opts ...core.Option) (any, error) {
+				return r.Invoke(ctx, input.(int), opts...)
+			}},
+		},
+	}
+	_, err := chain.Invoke(context.Background(), 5)
+	if err == nil {
+		t.Error("expected type mismatch error")
+	}
+}

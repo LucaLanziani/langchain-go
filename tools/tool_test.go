@@ -123,3 +123,155 @@ func TestRunnableTool(t *testing.T) {
 		t.Errorf("expected 'test', got %q", result)
 	}
 }
+
+func TestRunnableToolGetName(t *testing.T) {
+	tool := NewTool("mytool", "desc", func(_ context.Context, input string) (string, error) {
+		return input, nil
+	})
+	rt := NewRunnableTool(tool)
+	if rt.GetName() != "mytool" {
+		t.Errorf("expected 'mytool', got %q", rt.GetName())
+	}
+}
+
+func TestRunnableToolStream(t *testing.T) {
+	tool := NewTool("stream_tool", "desc", func(_ context.Context, input string) (string, error) {
+		return "streamed:" + input, nil
+	})
+	rt := NewRunnableTool(tool)
+	iter, err := rt.Stream(context.Background(), "hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result, ok, err := iter.Next()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected a chunk")
+	}
+	if result != "streamed:hello" {
+		t.Errorf("expected 'streamed:hello', got %q", result)
+	}
+}
+
+func TestRunnableToolBatch(t *testing.T) {
+	tool := NewTool("batch_tool", "desc", func(_ context.Context, input string) (string, error) {
+		return "out:" + input, nil
+	})
+	rt := NewRunnableTool(tool)
+	results, err := rt.Batch(context.Background(), []string{"a", "b"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if results[0] != "out:a" || results[1] != "out:b" {
+		t.Errorf("unexpected results: %v", results)
+	}
+}
+
+func TestExecuteToolCalls(t *testing.T) {
+	tool := NewTool("adder", "Adds", func(_ context.Context, input string) (string, error) {
+		return "result:" + input, nil
+	})
+	toolCalls := []core.ToolCall{
+		{ID: "c1", Name: "adder", Args: []byte(`{}`)},
+		{ID: "c2", Name: "nonexistent", Args: []byte(`{}`)},
+	}
+	messages, err := ExecuteToolCalls(context.Background(), toolCalls, []Tool{tool})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(messages))
+	}
+}
+
+func TestParseToolCallArgs(t *testing.T) {
+	type myArgs struct {
+		Query string `json:"query"`
+	}
+	tc := core.ToolCall{ID: "c1", Name: "search", Args: []byte(`{"query":"golang"}`)}
+	var args myArgs
+	if err := ParseToolCallArgs(tc, &args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if args.Query != "golang" {
+		t.Errorf("expected 'golang', got %q", args.Query)
+	}
+}
+
+func TestParseToolCallArgsInvalid(t *testing.T) {
+	tc := core.ToolCall{ID: "c1", Name: "tool", Args: []byte(`not valid json`)}
+	var args map[string]any
+	err := ParseToolCallArgs(tc, &args)
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+type typedSchemaTest struct {
+	Name    string   `json:"name" description:"A name"`
+	Count   int      `json:"count"`
+	Score   float64  `json:"score"`
+	Active  bool     `json:"active,omitempty"`
+	Tags    []string `json:"tags"`
+	Private string   `json:"-"`
+}
+
+func TestGenerateJSONSchemaAllTypes(t *testing.T) {
+	tool := NewTypedTool("typed", "A typed tool", typedSchemaTest{},
+		func(_ context.Context, args typedSchemaTest) (string, error) {
+			return args.Name, nil
+		},
+	)
+	schema := tool.ArgsSchema()
+	props := schema["properties"].(map[string]any)
+
+	// Check all type mappings.
+	for field, expectedType := range map[string]string{
+		"name": "string", "count": "integer", "score": "number", "tags": "array",
+	} {
+		p, ok := props[field].(map[string]any)
+		if !ok {
+			t.Errorf("field %q not in schema", field)
+			continue
+		}
+		if p["type"] != expectedType {
+			t.Errorf("field %q: expected type %q, got %v", field, expectedType, p["type"])
+		}
+	}
+	// active has omitempty so it should not be in required.
+	required, _ := schema["required"].([]string)
+	for _, r := range required {
+		if r == "active" {
+			t.Error("active should not be required (omitempty)")
+		}
+	}
+	// private should be excluded.
+	if _, ok := props["Private"]; ok {
+		t.Error("private field should not appear in schema")
+	}
+}
+
+func TestGenerateJSONSchemaNonStruct(t *testing.T) {
+	schema := generateJSONSchema("not a struct")
+	if schema["type"] != "object" {
+		t.Errorf("expected type 'object', got %v", schema["type"])
+	}
+}
+
+func TestGenerateJSONSchemaBoolType(t *testing.T) {
+	type boolArgs struct {
+		Flag bool `json:"flag"`
+	}
+	tool := NewTypedTool("bt", "bool test", boolArgs{},
+		func(_ context.Context, args boolArgs) (string, error) { return "", nil },
+	)
+	schema := tool.ArgsSchema()
+	props := schema["properties"].(map[string]any)
+	p := props["flag"].(map[string]any)
+	if p["type"] != "boolean" {
+		t.Errorf("expected 'boolean', got %v", p["type"])
+	}
+}
+

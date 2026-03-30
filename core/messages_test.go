@@ -1,6 +1,7 @@
 package core
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -97,5 +98,60 @@ func TestGetBufferStringDefaults(t *testing.T) {
 	result := GetBufferString(messages, "", "")
 	if result != "Human: test" {
 		t.Errorf("expected 'Human: test', got %q", result)
+	}
+}
+
+func TestGetAdditionalKwargs(t *testing.T) {
+	msg := &BaseMessage{
+		Content:           "hello",
+		AdditionalKwargs:  map[string]any{"key": "value"},
+	}
+	kwargs := msg.GetAdditionalKwargs()
+	if kwargs["key"] != "value" {
+		t.Errorf("expected key=value, got %v", kwargs)
+	}
+}
+
+func TestGetBufferStringAllTypes(t *testing.T) {
+	messages := []Message{
+		NewHumanMessage("hi"),
+		NewAIMessage("hello"),
+		NewSystemMessage("be helpful"),
+		NewToolMessage("result", "call_1"),
+		NewFunctionMessage("func", "output"),
+		NewGenericMessage("custom", "custom content"),
+	}
+	result := GetBufferString(messages, "Human", "AI")
+	if result == "" {
+		t.Error("expected non-empty result")
+	}
+	if !strings.Contains(result, "Tool: result") {
+		t.Errorf("expected 'Tool: result' in %q", result)
+	}
+	if !strings.Contains(result, "Function: output") {
+		t.Errorf("expected 'Function: output' in %q", result)
+	}
+	if !strings.Contains(result, "custom content") {
+		t.Errorf("expected 'custom content' in %q", result)
+	}
+}
+
+func TestNewDocument(t *testing.T) {
+	doc := NewDocument("page content", map[string]any{"source": "test.txt"})
+	if doc.PageContent != "page content" {
+		t.Errorf("expected 'page content', got %q", doc.PageContent)
+	}
+	if doc.Metadata["source"] != "test.txt" {
+		t.Errorf("expected source=test.txt, got %v", doc.Metadata["source"])
+	}
+}
+
+func TestNewDocumentNoMetadata(t *testing.T) {
+	doc := NewDocument("bare content")
+	if doc.PageContent != "bare content" {
+		t.Errorf("expected 'bare content', got %q", doc.PageContent)
+	}
+	if doc.Metadata != nil {
+		t.Errorf("expected nil metadata, got %v", doc.Metadata)
 	}
 }
