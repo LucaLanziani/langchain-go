@@ -3,11 +3,9 @@ module github.com/LucaLanziani/langchain-go
 go 1.24.0
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/github/copilot-sdk/go v0.1.23
 	github.com/google/uuid v1.6.0
 )
 
-require (
-	github.com/DATA-DOG/go-sqlmock v1.5.2 // indirect
-	github.com/google/jsonschema-go v0.4.2 // indirect
-)
+require github.com/google/jsonschema-go v0.4.2 // indirect
