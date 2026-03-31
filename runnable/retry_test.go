@@ -137,7 +137,9 @@ func TestRetryBatchRetriesEachItemIndependently(t *testing.T) {
 }
 
 func TestRetryContextCancellationDuringBackoff(t *testing.T) {
+	var attempts int32
 	r := NewLambda(func(_ context.Context, _ string) (string, error) {
+		atomic.AddInt32(&attempts, 1)
 		return "", errors.New("status 503")
 	})
 	wrapped := WithRetry[string, string](
@@ -161,6 +163,9 @@ func TestRetryContextCancellationDuringBackoff(t *testing.T) {
 	}
 	if elapsed >= 150*time.Millisecond {
 		t.Fatalf("expected early return on cancellation, took %v", elapsed)
+	}
+	if got := atomic.LoadInt32(&attempts); got != 1 {
+		t.Fatalf("expected only one attempt before cancellation, got %d", got)
 	}
 }
 

@@ -223,9 +223,9 @@ func doWithRetry[T any](ctx context.Context, cfg retryConfig, runnableName strin
 	return zero, lastErr
 }
 
-func calculateBackoff(cfg retryConfig, retryNumber int) time.Duration {
+func calculateBackoff(cfg retryConfig, attemptNumber int) time.Duration {
 	base := float64(cfg.InitialBackoff)
-	exponent := math.Pow(cfg.BackoffMultiplier, float64(retryNumber-1))
+	exponent := math.Pow(cfg.BackoffMultiplier, float64(attemptNumber-1))
 	wait := time.Duration(base * exponent)
 	if wait > cfg.MaxBackoff {
 		wait = cfg.MaxBackoff
@@ -233,9 +233,6 @@ func calculateBackoff(cfg retryConfig, retryNumber int) time.Duration {
 	if cfg.Jitter {
 		factor := 0.5 + rand.Float64()
 		wait = time.Duration(float64(wait) * factor)
-	}
-	if wait < 0 {
-		return 0
 	}
 	return wait
 }

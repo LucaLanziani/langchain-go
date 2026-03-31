@@ -219,7 +219,7 @@ func (l *tokenBucketLimiter) reserveDelay() time.Duration {
 	missing := 1 - l.tokens
 	waitSeconds := missing / l.rate
 	wait := time.Duration(waitSeconds * float64(time.Second))
-	if wait <= 0 {
+	if wait < time.Millisecond {
 		wait = time.Millisecond
 	}
 	return wait
