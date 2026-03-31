@@ -69,4 +69,3 @@ func TestStdoutHandlerWithColor(t *testing.T) {
 	// Just verify it doesn't panic.
 	h.OnChainStart(ctx, nil, "r", "", nil)
 }
-

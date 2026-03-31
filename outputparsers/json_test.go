@@ -74,18 +74,6 @@ func TestJSONOutputParserInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestJSONOutputParserParseMessage(t *testing.T) {
-	parser := NewJSONOutputParser[testStruct]()
-	var msg core.Message = core.NewAIMessage(`{"name": "Dave", "age": 40}`)
-	fresult, ferr := parser.ParseMessage(msg)
-	if ferr != nil {
-		t.Fatalf("unexpected error: %v", ferr)
-	}
-	if fresult.Name != "Dave" {
-		t.Errorf("expected name 'Dave', got %q", fresult.Name)
-	}
-}
-
 func TestJSONOutputParserWithName(t *testing.T) {
 	parser := NewJSONOutputParser[testStruct]()
 	if parser.GetName() != "JSONOutputParser" {

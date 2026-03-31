@@ -20,7 +20,7 @@ type ToolCallingAgent struct {
 }
 
 // NewToolCallingAgent creates a new ToolCallingAgent.
-// The prompt must include a MessagesPlaceholder("agent_scratchpad") for intermediate steps.
+// The prompt must include a Placeholder("agent_scratchpad") for intermediate steps.
 func NewToolCallingAgent(llm llms.ChatModel, agentTools []tools.Tool, prompt *prompts.ChatPromptTemplate) *ToolCallingAgent {
 	// Bind tools to the model.
 	toolDefs := tools.ToDefinitions(agentTools...)

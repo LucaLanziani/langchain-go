@@ -274,4 +274,3 @@ func TestGenerateJSONSchemaBoolType(t *testing.T) {
 		t.Errorf("expected 'boolean', got %v", p["type"])
 	}
 }
-

@@ -61,11 +61,6 @@ func NewChatPromptTemplate(messages ...MessageTemplate) *ChatPromptTemplate {
 	}
 }
 
-// FromMessages is an alias for NewChatPromptTemplate.
-func FromMessages(messages ...MessageTemplate) *ChatPromptTemplate {
-	return NewChatPromptTemplate(messages...)
-}
-
 // WithName sets the name for tracing.
 func (c *ChatPromptTemplate) WithName(name string) *ChatPromptTemplate {
 	c.name = name

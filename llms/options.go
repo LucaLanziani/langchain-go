@@ -8,7 +8,6 @@ const (
 	ConfigKeyMaxTokens   = "max_tokens"
 	ConfigKeyTopP        = "top_p"
 	ConfigKeyModel       = "model"
-	ConfigKeyResponseFmt = "response_format"
 )
 
 // WithTemperature sets the temperature for generation.

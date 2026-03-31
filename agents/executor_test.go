@@ -11,6 +11,16 @@ import (
 	"github.com/LucaLanziani/langchain-go/tools"
 )
 
+// mustNewExecutor is a test helper that creates an AgentExecutor or fails the test.
+func mustNewExecutor(t *testing.T, agent Agent, agentTools []tools.Tool, options ...ExecutorOption) *AgentExecutor {
+	t.Helper()
+	exec, err := NewAgentExecutor(agent, agentTools, options...)
+	if err != nil {
+		t.Fatalf("NewAgentExecutor: %v", err)
+	}
+	return exec
+}
+
 // mockTool implements tools.Tool interface for testing.
 type mockTool struct {
 	name   string
@@ -20,8 +30,8 @@ type mockTool struct {
 }
 
 func (t *mockTool) Name() string                                    { return t.name }
-func (t *mockTool) Description() string                              { return t.desc }
-func (t *mockTool) ArgsSchema() map[string]any                       { return map[string]any{} }
+func (t *mockTool) Description() string                             { return t.desc }
+func (t *mockTool) ArgsSchema() map[string]any                      { return map[string]any{} }
 func (t *mockTool) Run(_ context.Context, _ string) (string, error) { return t.result, t.err }
 
 // mockAgent implements the Agent interface for testing.
@@ -48,18 +58,16 @@ func (a *mockAgent) OutputKeys() []string { return []string{"output"} }
 
 // --- AgentExecutor tests ---
 
-func TestNewAgentExecutorNilPanics(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for nil agent")
-		}
-	}()
-	NewAgentExecutor(nil, nil)
+func TestNewAgentExecutorNilReturnsError(t *testing.T) {
+	_, err := NewAgentExecutor(nil, nil)
+	if err == nil {
+		t.Error("expected error for nil agent")
+	}
 }
 
 func TestAgentExecutorGetName(t *testing.T) {
 	agent := &mockAgent{}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	if exec.GetName() != "AgentExecutor" {
 		t.Errorf("expected 'AgentExecutor', got %q", exec.GetName())
 	}
@@ -71,7 +79,7 @@ func TestAgentExecutorGetName(t *testing.T) {
 
 func TestAgentExecutorOptions(t *testing.T) {
 	agent := &mockAgent{}
-	exec := NewAgentExecutor(agent, nil,
+	exec := mustNewExecutor(t, agent, nil,
 		WithMaxIterations(5),
 		WithReturnIntermediateSteps(true),
 		WithHandleParsingErrors(true),
@@ -93,7 +101,7 @@ func TestAgentExecutorFinishImmediately(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "42"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	result, err := exec.Invoke(context.Background(), map[string]any{"input": "what?"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -109,7 +117,7 @@ func TestAgentExecutorFinishWithIntermediateSteps(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "done"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, nil, WithReturnIntermediateSteps(true))
+	exec := mustNewExecutor(t, agent, nil, WithReturnIntermediateSteps(true))
 	result, err := exec.Invoke(context.Background(), map[string]any{"input": "q"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -127,7 +135,7 @@ func TestAgentExecutorCallsToolThenFinishes(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "4"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, []tools.Tool{tool})
+	exec := mustNewExecutor(t, agent, []tools.Tool{tool})
 	result, err := exec.Invoke(context.Background(), map[string]any{"input": "2+2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -145,7 +153,7 @@ func TestAgentExecutorToolError(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "recovered"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, []tools.Tool{tool})
+	exec := mustNewExecutor(t, agent, []tools.Tool{tool})
 	result, err := exec.Invoke(context.Background(), map[string]any{"input": "q"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -164,7 +172,7 @@ func TestAgentExecutorUnknownTool(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "ok"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, []tools.Tool{knownTool})
+	exec := mustNewExecutor(t, agent, []tools.Tool{knownTool})
 	result, err := exec.Invoke(context.Background(), map[string]any{"input": "q"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -182,7 +190,7 @@ func TestAgentExecutorMaxIterations(t *testing.T) {
 		agent.planResponses = append(agent.planResponses,
 			&AgentOutput{Actions: []AgentAction{{Tool: "non_existent", ToolInput: "x"}}})
 	}
-	exec := NewAgentExecutor(agent, nil, WithMaxIterations(3))
+	exec := mustNewExecutor(t, agent, nil, WithMaxIterations(3))
 	_, err := exec.Invoke(context.Background(), map[string]any{"input": "q"})
 	if err == nil {
 		t.Error("expected error for max iterations exceeded")
@@ -193,7 +201,7 @@ func TestAgentExecutorPlanError(t *testing.T) {
 	agent := &mockAgent{
 		planErrors: []error{errors.New("planning failed")},
 	}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	_, err := exec.Invoke(context.Background(), map[string]any{"input": "q"})
 	if err == nil {
 		t.Error("expected error from planning failure")
@@ -211,7 +219,7 @@ func TestAgentExecutorHandleParsingErrors(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "retried"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, nil, WithHandleParsingErrors(true))
+	exec := mustNewExecutor(t, agent, nil, WithHandleParsingErrors(true))
 	result, err := exec.Invoke(context.Background(), map[string]any{"input": "q"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -229,7 +237,7 @@ func TestAgentExecutorContextCancelled(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	_, err := exec.Invoke(ctx, map[string]any{"input": "q"})
 	if err == nil {
 		t.Error("expected error from cancelled context")
@@ -248,7 +256,7 @@ func TestAgentExecutorWithCallbacks(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "done"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	_, err := exec.Invoke(context.Background(), map[string]any{"input": "q"}, core.WithCallbacks(cb))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -277,7 +285,7 @@ func TestAgentExecutorWithCallbacksOnToolCall(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "ok"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, []tools.Tool{tool})
+	exec := mustNewExecutor(t, agent, []tools.Tool{tool})
 	_, _ = exec.Invoke(context.Background(), map[string]any{"input": "q"}, core.WithCallbacks(cb))
 	if !toolStarted {
 		t.Error("expected OnToolStart to be called")
@@ -299,7 +307,7 @@ func TestAgentExecutorWithCallbacksOnToolError(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "ok"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, []tools.Tool{tool})
+	exec := mustNewExecutor(t, agent, []tools.Tool{tool})
 	_, _ = exec.Invoke(context.Background(), map[string]any{"input": "q"}, core.WithCallbacks(cb))
 	if !toolErrored {
 		t.Error("expected OnToolError to be called")
@@ -317,7 +325,7 @@ func TestAgentExecutorWithCallbacksAndAgentAction(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "ok"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	_, _ = exec.Invoke(context.Background(), map[string]any{"input": "q"}, core.WithCallbacks(cb))
 	if !actionCalled {
 		t.Error("expected OnAgentAction to be called")
@@ -330,7 +338,7 @@ func TestAgentExecutorPlanErrorWithCallback(t *testing.T) {
 	agent := &mockAgent{
 		planErrors: []error{errors.New("plan error")},
 	}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	_, _ = exec.Invoke(context.Background(), map[string]any{"input": "q"}, core.WithCallbacks(cb))
 	if !errored {
 		t.Error("expected OnChainError to be called")
@@ -345,7 +353,7 @@ func TestAgentExecutorMaxIterationsWithCallback(t *testing.T) {
 		agent.planResponses = append(agent.planResponses,
 			&AgentOutput{Actions: []AgentAction{{Tool: "non_existent", ToolInput: "x"}}})
 	}
-	exec := NewAgentExecutor(agent, nil, WithMaxIterations(2))
+	exec := mustNewExecutor(t, agent, nil, WithMaxIterations(2))
 	_, _ = exec.Invoke(context.Background(), map[string]any{"input": "q"}, core.WithCallbacks(cb))
 	if !errored {
 		t.Error("expected OnChainError to be called on max iterations")
@@ -358,7 +366,7 @@ func TestAgentExecutorStream(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "streamed"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	iter, err := exec.Stream(context.Background(), map[string]any{"input": "q"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -376,7 +384,7 @@ func TestAgentExecutorStreamError(t *testing.T) {
 	agent := &mockAgent{
 		planErrors: []error{errors.New("stream plan error")},
 	}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	_, err := exec.Stream(context.Background(), map[string]any{"input": "q"})
 	if err == nil {
 		t.Error("expected error from stream")
@@ -390,7 +398,7 @@ func TestAgentExecutorBatch(t *testing.T) {
 			{Finish: &AgentFinish{ReturnValues: map[string]any{"output": "b"}}},
 		},
 	}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	results, err := exec.Batch(context.Background(), []map[string]any{
 		{"input": "q1"},
 		{"input": "q2"},
@@ -407,7 +415,7 @@ func TestAgentExecutorBatchError(t *testing.T) {
 	agent := &mockAgent{
 		planErrors: []error{errors.New("batch error")},
 	}
-	exec := NewAgentExecutor(agent, nil)
+	exec := mustNewExecutor(t, agent, nil)
 	_, err := exec.Batch(context.Background(), []map[string]any{{"input": "q"}})
 	if err == nil {
 		t.Error("expected error in batch")

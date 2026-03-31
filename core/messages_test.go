@@ -103,8 +103,8 @@ func TestGetBufferStringDefaults(t *testing.T) {
 
 func TestGetAdditionalKwargs(t *testing.T) {
 	msg := &BaseMessage{
-		Content:           "hello",
-		AdditionalKwargs:  map[string]any{"key": "value"},
+		Content:          "hello",
+		AdditionalKwargs: map[string]any{"key": "value"},
 	}
 	kwargs := msg.GetAdditionalKwargs()
 	if kwargs["key"] != "value" {

@@ -46,18 +46,6 @@ func TestStringOutputParserBatch(t *testing.T) {
 	}
 }
 
-func TestStringOutputParserParseMessage(t *testing.T) {
-	parser := NewStringOutputParser()
-	var msg core.Message = core.NewAIMessage("via interface")
-	result, err := parser.ParseMessage(msg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != "via interface" {
-		t.Errorf("expected 'via interface', got %q", result)
-	}
-}
-
 func TestStringOutputParserGetName(t *testing.T) {
 	parser := NewStringOutputParser()
 	if parser.GetName() != "StringOutputParser" {

@@ -2,6 +2,7 @@ package runnable
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/LucaLanziani/langchain-go/core"
 )
@@ -69,7 +70,7 @@ func (l *Lambda[I, O]) Batch(ctx context.Context, inputs []I, opts ...core.Optio
 	for i, input := range inputs {
 		result, err := l.fn(ctx, input)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("batch item %d: %w", i, err)
 		}
 		results[i] = result
 	}

@@ -3,6 +3,7 @@ package core
 
 import (
 	"encoding/json"
+	"strings"
 )
 
 // MessageType identifies the role/type of a message.
@@ -23,24 +24,6 @@ type ToolCall struct {
 	Name     string          `json:"name"`
 	Args     json.RawMessage `json:"args"`
 	Type     string          `json:"type,omitempty"`
-}
-
-// ToolCallChunk represents a streaming chunk of a tool call.
-type ToolCallChunk struct {
-	ID    string `json:"id,omitempty"`
-	Name  string `json:"name,omitempty"`
-	Args  string `json:"args,omitempty"`
-	Index int    `json:"index,omitempty"`
-}
-
-// ContentBlock represents a block of content within a message.
-// It can be text, an image, or other content types.
-type ContentBlock struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
-	ImageURL string `json:"image_url,omitempty"`
-	MIMEType string `json:"mime_type,omitempty"`
-	Data     []byte `json:"data,omitempty"`
 }
 
 // Message is the interface all message types implement.
@@ -89,9 +72,8 @@ func NewHumanMessage(content string) *HumanMessage {
 // AIMessage represents a message from the AI assistant.
 type AIMessage struct {
 	BaseMessage
-	ToolCalls      []ToolCall      `json:"tool_calls,omitempty"`
-	ToolCallChunks []ToolCallChunk `json:"tool_call_chunks,omitempty"`
-	UsageMetadata  *UsageMetadata  `json:"usage_metadata,omitempty"`
+	ToolCalls     []ToolCall     `json:"tool_calls,omitempty"`
+	UsageMetadata *UsageMetadata `json:"usage_metadata,omitempty"`
 }
 
 // GetType returns MessageTypeAI.
@@ -177,9 +159,6 @@ func NewGenericMessage(role, content string) *GenericMessage {
 	}
 }
 
-// Messages is a convenience type for a slice of Message.
-type Messages []Message
-
 // GetBufferString formats messages into a string representation.
 func GetBufferString(messages []Message, humanPrefix, aiPrefix string) string {
 	if humanPrefix == "" {
@@ -188,25 +167,32 @@ func GetBufferString(messages []Message, humanPrefix, aiPrefix string) string {
 	if aiPrefix == "" {
 		aiPrefix = "AI"
 	}
-	var result string
+	var sb strings.Builder
 	for i, msg := range messages {
 		if i > 0 {
-			result += "\n"
+			sb.WriteByte('\n')
 		}
 		switch msg.GetType() {
 		case MessageTypeHuman:
-			result += humanPrefix + ": " + msg.GetContent()
+			sb.WriteString(humanPrefix)
+			sb.WriteString(": ")
+			sb.WriteString(msg.GetContent())
 		case MessageTypeAI:
-			result += aiPrefix + ": " + msg.GetContent()
+			sb.WriteString(aiPrefix)
+			sb.WriteString(": ")
+			sb.WriteString(msg.GetContent())
 		case MessageTypeSystem:
-			result += "System: " + msg.GetContent()
+			sb.WriteString("System: ")
+			sb.WriteString(msg.GetContent())
 		case MessageTypeTool:
-			result += "Tool: " + msg.GetContent()
+			sb.WriteString("Tool: ")
+			sb.WriteString(msg.GetContent())
 		case MessageTypeFunction:
-			result += "Function: " + msg.GetContent()
+			sb.WriteString("Function: ")
+			sb.WriteString(msg.GetContent())
 		default:
-			result += msg.GetContent()
+			sb.WriteString(msg.GetContent())
 		}
 	}
-	return result
+	return sb.String()
 }

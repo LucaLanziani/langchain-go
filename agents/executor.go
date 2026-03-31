@@ -35,9 +35,9 @@ type AgentExecutor struct {
 }
 
 // NewAgentExecutor creates a new AgentExecutor.
-func NewAgentExecutor(agent Agent, agentTools []tools.Tool, options ...ExecutorOption) *AgentExecutor {
+func NewAgentExecutor(agent Agent, agentTools []tools.Tool, options ...ExecutorOption) (*AgentExecutor, error) {
 	if agent == nil {
-		panic("NewAgentExecutor: agent must not be nil")
+		return nil, fmt.Errorf("NewAgentExecutor: agent must not be nil")
 	}
 
 	toolMap := make(map[string]tools.Tool)
@@ -56,7 +56,7 @@ func NewAgentExecutor(agent Agent, agentTools []tools.Tool, options ...ExecutorO
 		opt(exec)
 	}
 
-	return exec
+	return exec, nil
 }
 
 // ExecutorOption configures the AgentExecutor.

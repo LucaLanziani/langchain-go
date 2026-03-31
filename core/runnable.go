@@ -105,28 +105,3 @@ func (s *StreamIterator[T]) Close() {
 		}()
 	}
 }
-
-// StreamEvent represents an event emitted during streaming execution.
-// Used for observability and debugging.
-type StreamEvent struct {
-	// Event is the event type (e.g., "on_llm_start", "on_chain_stream").
-	Event string `json:"event"`
-
-	// RunID is a unique identifier for this execution run.
-	RunID string `json:"run_id"`
-
-	// ParentIDs contains the IDs of parent runs.
-	ParentIDs []string `json:"parent_ids,omitempty"`
-
-	// Name is the name of the runnable that generated this event.
-	Name string `json:"name"`
-
-	// Tags associated with the runnable.
-	Tags []string `json:"tags,omitempty"`
-
-	// Metadata associated with the runnable.
-	Metadata map[string]any `json:"metadata,omitempty"`
-
-	// Data contains event-specific data (input, output, or chunk).
-	Data map[string]any `json:"data,omitempty"`
-}

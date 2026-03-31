@@ -94,7 +94,7 @@ func TestChatPromptTemplateInvoke(t *testing.T) {
 }
 
 func TestFromMessages(t *testing.T) {
-	prompt := FromMessages(
+	prompt := NewChatPromptTemplate(
 		System("sys"),
 		Human("hello"),
 	)
@@ -172,7 +172,7 @@ func TestChatPromptTemplateGenericRole(t *testing.T) {
 }
 
 func TestMessagesPlaceholderFunc(t *testing.T) {
-	mt := MessagesPlaceholder("history")
+	mt := Placeholder("history")
 	if mt.Role != "placeholder" {
 		t.Errorf("expected role 'placeholder', got %q", mt.Role)
 	}

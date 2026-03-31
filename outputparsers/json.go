@@ -48,11 +48,6 @@ func (p *JSONOutputParser[T]) Parse(msg *core.AIMessage) (T, error) {
 	return p.ParseString(msg.GetContent())
 }
 
-// ParseMessage extracts and parses JSON from any Message interface.
-func (p *JSONOutputParser[T]) ParseMessage(msg core.Message) (T, error) {
-	return p.ParseString(msg.GetContent())
-}
-
 // ParseString parses JSON from a raw string, handling code blocks.
 func (p *JSONOutputParser[T]) ParseString(text string) (T, error) {
 	var result T

@@ -38,11 +38,6 @@ func (p *StringOutputParser) Parse(msg *core.AIMessage) (string, error) {
 	return msg.GetContent(), nil
 }
 
-// ParseMessage extracts content from any Message interface.
-func (p *StringOutputParser) ParseMessage(msg core.Message) (string, error) {
-	return msg.GetContent(), nil
-}
-
 // Invoke parses the message.
 func (p *StringOutputParser) Invoke(ctx context.Context, input *core.AIMessage, opts ...core.Option) (string, error) {
 	return p.Parse(input)

@@ -636,4 +636,3 @@ func TestRetrievalQABatchError(t *testing.T) {
 		t.Error("expected error in batch")
 	}
 }
-

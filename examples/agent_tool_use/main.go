@@ -56,9 +56,12 @@ func main() {
 	// Create the agent and executor.
 	model := openai.New()
 	agent := agents.NewToolCallingAgent(model, agentTools, prompt)
-	executor := agents.NewAgentExecutor(agent, agentTools,
+	executor, err := agents.NewAgentExecutor(agent, agentTools,
 		agents.WithMaxIterations(5),
 	)
+	if err != nil {
+		log.Fatalf("Error creating executor: %v", err)
+	}
 
 	// Run with a stdout callback for visibility.
 	result, err := executor.Invoke(ctx, map[string]any{
