@@ -94,26 +94,26 @@ func (s *Store) SimilaritySearchWithScore(ctx context.Context, query string, k i
 		doc   *core.Document
 		score float64
 	}
-	var scored_ []scored
+	var scoredDocs []scored
 	for _, d := range s.docs {
 		sim := cosineSimilarity(queryVec, d.Embedding)
-		scored_ = append(scored_, scored{doc: d.Document, score: sim})
+		scoredDocs = append(scoredDocs, scored{doc: d.Document, score: sim})
 	}
 
 	// Sort by score descending.
-	sort.Slice(scored_, func(i, j int) bool {
-		return scored_[i].score > scored_[j].score
+	sort.Slice(scoredDocs, func(i, j int) bool {
+		return scoredDocs[i].score > scoredDocs[j].score
 	})
 
-	if k > len(scored_) {
-		k = len(scored_)
+	if k > len(scoredDocs) {
+		k = len(scoredDocs)
 	}
 
 	results := make([]vectorstores.DocumentWithScore, k)
 	for i := 0; i < k; i++ {
 		results[i] = vectorstores.DocumentWithScore{
-			Document: scored_[i].doc,
-			Score:    scored_[i].score,
+			Document: scoredDocs[i].doc,
+			Score:    scoredDocs[i].score,
 		}
 	}
 	return results, nil

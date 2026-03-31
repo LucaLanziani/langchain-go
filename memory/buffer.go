@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/LucaLanziani/langchain-go/core"
 )
@@ -98,7 +99,7 @@ func toString(v any) string {
 	if s, ok := v.(string); ok {
 		return s
 	}
-	return ""
+	return fmt.Sprint(v)
 }
 
 // Ensure ConversationBufferMemory implements Memory.

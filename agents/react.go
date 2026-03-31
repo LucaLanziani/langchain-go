@@ -110,7 +110,10 @@ func (a *ReActAgent) OutputKeys() []string {
 func (a *ReActAgent) renderToolDescriptions() string {
 	var sb strings.Builder
 	for _, t := range a.tools {
-		sb.WriteString(fmt.Sprintf("%s: %s\n", t.Name(), t.Description()))
+		sb.WriteString(t.Name())
+		sb.WriteString(": ")
+		sb.WriteString(t.Description())
+		sb.WriteByte('\n')
 	}
 	return sb.String()
 }
@@ -131,7 +134,9 @@ func formatReActScratchpad(steps []AgentStep) []core.Message {
 	var sb strings.Builder
 	for _, step := range steps {
 		sb.WriteString(step.Action.Log)
-		sb.WriteString(fmt.Sprintf("\nObservation: %s\nThought: ", step.Observation))
+		sb.WriteString("\nObservation: ")
+		sb.WriteString(step.Observation)
+		sb.WriteString("\nThought: ")
 	}
 	return []core.Message{core.NewAIMessage(sb.String())}
 }

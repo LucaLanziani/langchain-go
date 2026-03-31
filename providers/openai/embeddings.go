@@ -42,7 +42,7 @@ func (e *Embeddings) EmbedDocuments(ctx context.Context, texts []string) ([][]fl
 		"input": texts,
 	}
 
-	cm := &ChatModel{opts: e.opts, client: defaultHTTPClient()}
+	cm := &ChatModel{opts: e.opts, client: &http.Client{}}
 	respBody, err := cm.doRequest(ctx, "/embeddings", reqBody)
 	if err != nil {
 		return nil, err
@@ -83,8 +83,4 @@ type embeddingData struct {
 	Object    string    `json:"object"`
 	Embedding []float64 `json:"embedding"`
 	Index     int       `json:"index"`
-}
-
-func defaultHTTPClient() *http.Client {
-	return &http.Client{}
 }

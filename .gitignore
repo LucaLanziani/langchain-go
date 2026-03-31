@@ -6,6 +6,7 @@
 *.dylib
 *.test
 *.out
+copilot_chat
 
 # Go workspace
 go.work
