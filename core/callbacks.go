@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"time"
 )
 
 // CallbackHandler is the interface for receiving events during LangChain execution.
@@ -36,6 +37,9 @@ type CallbackHandler interface {
 
 	// Text callbacks
 	OnText(ctx context.Context, text string, runID string)
+
+	// Retry callbacks
+	OnRetry(ctx context.Context, data RetryData)
 }
 
 // AgentActionData holds data for agent action callbacks.
@@ -57,6 +61,14 @@ type LLMResult struct {
 	LLMOutput   map[string]any `json:"llm_output,omitempty"`
 }
 
+// RetryData holds retry metadata for retry callbacks.
+type RetryData struct {
+	Attempt         int
+	Error           error
+	BackoffDuration time.Duration
+	RunnableName    string
+}
+
 // BaseCallbackHandler provides no-op implementations of all CallbackHandler methods.
 // Embed this in your handler to only override the methods you care about.
 type BaseCallbackHandler struct{}
@@ -65,23 +77,24 @@ func (BaseCallbackHandler) OnLLMStart(_ context.Context, _ []string, _ string, _
 }
 func (BaseCallbackHandler) OnChatModelStart(_ context.Context, _ []Message, _ string, _ string, _ map[string]any) {
 }
-func (BaseCallbackHandler) OnLLMNewToken(_ context.Context, _ string, _ string)               {}
-func (BaseCallbackHandler) OnLLMEnd(_ context.Context, _ *LLMResult, _ string)                {}
-func (BaseCallbackHandler) OnLLMError(_ context.Context, _ error, _ string)                   {}
+func (BaseCallbackHandler) OnLLMNewToken(_ context.Context, _ string, _ string) {}
+func (BaseCallbackHandler) OnLLMEnd(_ context.Context, _ *LLMResult, _ string)  {}
+func (BaseCallbackHandler) OnLLMError(_ context.Context, _ error, _ string)     {}
 func (BaseCallbackHandler) OnChainStart(_ context.Context, _ map[string]any, _ string, _ string, _ map[string]any) {
 }
-func (BaseCallbackHandler) OnChainEnd(_ context.Context, _ map[string]any, _ string)          {}
-func (BaseCallbackHandler) OnChainError(_ context.Context, _ error, _ string)                 {}
+func (BaseCallbackHandler) OnChainEnd(_ context.Context, _ map[string]any, _ string) {}
+func (BaseCallbackHandler) OnChainError(_ context.Context, _ error, _ string)        {}
 func (BaseCallbackHandler) OnToolStart(_ context.Context, _ string, _ string, _ string, _ string) {
 }
-func (BaseCallbackHandler) OnToolEnd(_ context.Context, _ string, _ string)                   {}
-func (BaseCallbackHandler) OnToolError(_ context.Context, _ error, _ string)                  {}
-func (BaseCallbackHandler) OnAgentAction(_ context.Context, _ AgentActionData, _ string)      {}
-func (BaseCallbackHandler) OnAgentFinish(_ context.Context, _ AgentFinishData, _ string)      {}
-func (BaseCallbackHandler) OnRetrieverStart(_ context.Context, _ string, _ string, _ string)  {}
-func (BaseCallbackHandler) OnRetrieverEnd(_ context.Context, _ []*Document, _ string)         {}
-func (BaseCallbackHandler) OnRetrieverError(_ context.Context, _ error, _ string)             {}
-func (BaseCallbackHandler) OnText(_ context.Context, _ string, _ string)                      {}
+func (BaseCallbackHandler) OnToolEnd(_ context.Context, _ string, _ string)                  {}
+func (BaseCallbackHandler) OnToolError(_ context.Context, _ error, _ string)                 {}
+func (BaseCallbackHandler) OnAgentAction(_ context.Context, _ AgentActionData, _ string)     {}
+func (BaseCallbackHandler) OnAgentFinish(_ context.Context, _ AgentFinishData, _ string)     {}
+func (BaseCallbackHandler) OnRetrieverStart(_ context.Context, _ string, _ string, _ string) {}
+func (BaseCallbackHandler) OnRetrieverEnd(_ context.Context, _ []*Document, _ string)        {}
+func (BaseCallbackHandler) OnRetrieverError(_ context.Context, _ error, _ string)            {}
+func (BaseCallbackHandler) OnText(_ context.Context, _ string, _ string)                     {}
+func (BaseCallbackHandler) OnRetry(_ context.Context, _ RetryData)                           {}
 
 // Ensure BaseCallbackHandler implements CallbackHandler.
 var _ CallbackHandler = (*BaseCallbackHandler)(nil)

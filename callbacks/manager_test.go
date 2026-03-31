@@ -65,6 +65,9 @@ func (h *trackingHandler) OnRetrieverError(_ context.Context, _ error, _ string)
 func (h *trackingHandler) OnText(_ context.Context, _ string, _ string) {
 	h.called = append(h.called, "OnText")
 }
+func (h *trackingHandler) OnRetry(_ context.Context, _ core.RetryData) {
+	h.called = append(h.called, "OnRetry")
+}
 
 func TestManagerDispatchesAll(t *testing.T) {
 	h := &trackingHandler{}
@@ -88,6 +91,7 @@ func TestManagerDispatchesAll(t *testing.T) {
 	m.OnRetrieverEnd(ctx, nil, "run1")
 	m.OnRetrieverError(ctx, errors.New("e"), "run1")
 	m.OnText(ctx, "text", "run1")
+	m.OnRetry(ctx, core.RetryData{})
 
 	expected := []string{
 		"OnLLMStart", "OnChatModelStart", "OnLLMNewToken", "OnLLMEnd", "OnLLMError",
@@ -95,7 +99,7 @@ func TestManagerDispatchesAll(t *testing.T) {
 		"OnToolStart", "OnToolEnd", "OnToolError",
 		"OnAgentAction", "OnAgentFinish",
 		"OnRetrieverStart", "OnRetrieverEnd", "OnRetrieverError",
-		"OnText",
+		"OnText", "OnRetry",
 	}
 	if len(h.called) != len(expected) {
 		t.Errorf("expected %d calls, got %d: %v", len(expected), len(h.called), h.called)
