@@ -7,6 +7,12 @@ import (
 	"github.com/LucaLanziani/langchain-go/core"
 )
 
+// TextSplitter is the interface implemented by all text splitters.
+type TextSplitter interface {
+	SplitText(text string) []string
+	SplitDocuments(documents []*core.Document) []*core.Document
+}
+
 // RecursiveCharacterTextSplitter splits text by recursively trying different
 // separators until chunks are small enough.
 type RecursiveCharacterTextSplitter struct {
