@@ -20,10 +20,10 @@ const (
 
 // ToolCall represents a request from the AI to invoke a tool.
 type ToolCall struct {
-	ID       string          `json:"id"`
-	Name     string          `json:"name"`
-	Args     json.RawMessage `json:"args"`
-	Type     string          `json:"type,omitempty"`
+	ID   string          `json:"id"`
+	Name string          `json:"name"`
+	Args json.RawMessage `json:"args"`
+	Type string          `json:"type,omitempty"`
 }
 
 // Message is the interface all message types implement.

@@ -10,8 +10,8 @@ import (
 
 // Embeddings implements the embedding interface using OpenAI's API.
 type Embeddings struct {
-	opts   *Options
-	model  string
+	opts  *Options
+	model string
 }
 
 // NewEmbeddings creates a new OpenAI Embeddings instance.
@@ -73,10 +73,10 @@ func (e *Embeddings) EmbedQuery(ctx context.Context, text string) ([]float64, er
 }
 
 type embeddingResponse struct {
-	Object string           `json:"object"`
-	Data   []embeddingData  `json:"data"`
-	Model  string           `json:"model"`
-	Usage  *openAIUsage     `json:"usage,omitempty"`
+	Object string          `json:"object"`
+	Data   []embeddingData `json:"data"`
+	Model  string          `json:"model"`
+	Usage  *openAIUsage    `json:"usage,omitempty"`
 }
 
 type embeddingData struct {
