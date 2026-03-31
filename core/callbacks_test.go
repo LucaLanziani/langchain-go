@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 // embeddedHandler embeds BaseCallbackHandler but overrides nothing.
@@ -32,4 +33,5 @@ func TestBaseCallbackHandlerNoOps(t *testing.T) {
 	h.OnRetrieverEnd(ctx, []*Document{{PageContent: "doc"}}, "run1")
 	h.OnRetrieverError(ctx, ErrTest, "run1")
 	h.OnText(ctx, "some text", "run1")
+	h.OnRetry(ctx, RetryData{Attempt: 1, Error: ErrTest, BackoffDuration: time.Millisecond, RunnableName: "RunnableLambda"})
 }

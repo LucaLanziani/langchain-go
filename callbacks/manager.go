@@ -184,5 +184,12 @@ func (m *Manager) OnText(ctx context.Context, text string, runID string) {
 	}
 }
 
+// OnRetry dispatches to all handlers.
+func (m *Manager) OnRetry(ctx context.Context, data core.RetryData) {
+	for _, h := range m.handlers {
+		h.OnRetry(ctx, data)
+	}
+}
+
 // Ensure Manager implements CallbackHandler.
 var _ core.CallbackHandler = (*Manager)(nil)
