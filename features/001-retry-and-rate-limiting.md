@@ -1,5 +1,7 @@
 # Feature 001: Retry and Rate Limiting Middleware
 
+> **GitHub Issue:** [#1](https://github.com/LucaLanziani/langchain-go/issues/1)
+
 ## User Story
 
 **As a** developer building a production AI application with langchain-go,

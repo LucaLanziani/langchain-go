@@ -1,5 +1,7 @@
 # Feature 004: Ollama Provider for Local LLMs
 
+> **GitHub Issue:** [#4](https://github.com/LucaLanziani/langchain-go/issues/4)
+
 ## User Story
 
 **As a** developer who wants to run AI applications locally without cloud API dependencies,

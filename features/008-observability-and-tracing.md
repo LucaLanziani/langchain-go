@@ -1,5 +1,7 @@
 # Feature 008: Observability with OpenTelemetry and LangSmith
 
+> **GitHub Issue:** [#8](https://github.com/LucaLanziani/langchain-go/issues/8)
+
 ## User Story
 
 **As a** developer running AI applications in production,

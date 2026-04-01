@@ -1,5 +1,7 @@
 # Feature 010: Built-in Web Search and HTTP Tools
 
+> **GitHub Issue:** [#10](https://github.com/LucaLanziani/langchain-go/issues/10)
+
 ## User Story
 
 **As a** developer building an agent that needs access to real-time information,

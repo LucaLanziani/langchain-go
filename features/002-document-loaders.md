@@ -1,5 +1,7 @@
 # Feature 002: Document Loaders
 
+> **GitHub Issue:** [#2](https://github.com/LucaLanziani/langchain-go/issues/2)
+
 ## User Story
 
 **As a** developer building a RAG pipeline,

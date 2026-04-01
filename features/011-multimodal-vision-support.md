@@ -1,5 +1,7 @@
 # Feature 011: Multimodal / Vision Support
 
+> **GitHub Issue:** [#11](https://github.com/LucaLanziani/langchain-go/issues/11)
+
 ## User Story
 
 **As a** developer building applications that process images alongside text,

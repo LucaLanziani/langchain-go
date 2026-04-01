@@ -1,5 +1,7 @@
 # Feature 005: PostgreSQL pgvector Store
 
+> **GitHub Issue:** [#5](https://github.com/LucaLanziani/langchain-go/issues/5)
+
 ## User Story
 
 **As a** developer building a production RAG application,

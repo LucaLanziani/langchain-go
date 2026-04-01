@@ -1,5 +1,7 @@
 # Feature 006: Persistent Conversation History
 
+> **GitHub Issue:** [#6](https://github.com/LucaLanziani/langchain-go/issues/6)
+
 ## User Story
 
 **As a** developer building a chatbot or multi-turn agent,

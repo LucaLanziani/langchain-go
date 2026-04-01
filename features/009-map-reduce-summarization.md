@@ -1,5 +1,7 @@
 # Feature 009: Map-Reduce Summarization Chain
 
+> **GitHub Issue:** [#9](https://github.com/LucaLanziani/langchain-go/issues/9)
+
 ## User Story
 
 **As a** developer working with large documents that exceed an LLM's context window,

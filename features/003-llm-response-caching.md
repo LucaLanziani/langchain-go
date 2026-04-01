@@ -1,5 +1,7 @@
 # Feature 003: LLM Response Caching
 
+> **GitHub Issue:** [#3](https://github.com/LucaLanziani/langchain-go/issues/3)
+
 ## User Story
 
 **As a** developer iterating on prompts or running recurring queries,

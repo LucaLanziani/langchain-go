@@ -1,5 +1,7 @@
 # Feature 007: Structured Output with Validation
 
+> **GitHub Issue:** [#7](https://github.com/LucaLanziani/langchain-go/issues/7)
+
 ## User Story
 
 **As a** developer who needs LLMs to produce structured data (not just free text),
