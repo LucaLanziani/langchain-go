@@ -36,6 +36,12 @@ type Options struct {
 	// Tools are langchain Tool implementations that get bridged to SDK tool handlers.
 	// When set, the SDK manages the full tool-calling loop internally.
 	Tools []tools.Tool
+
+	// ReasoningEffort controls the effort the model spends on reasoning.
+	// Valid values: "low", "medium", "high", "xhigh".
+	// Only applies to models that support reasoning (e.g. gpt-5-mini, gpt-5).
+	// Empty string (default) disables the field and uses the model default.
+	ReasoningEffort string
 }
 
 // DefaultOptions returns sensible defaults for the GitHub Copilot provider.
@@ -80,4 +86,12 @@ func WithMaxConcurrency(n int) OptionFunc {
 // final response after all tool calls are resolved.
 func WithTools(t ...tools.Tool) OptionFunc {
 	return func(o *Options) { o.Tools = append(o.Tools, t...) }
+}
+
+// WithReasoningEffort sets the reasoning effort level for models that support it.
+// Valid values: "low", "medium", "high", "xhigh".
+// When set, the model will emit reasoning_delta events alongside message_delta events
+// during streaming, and ThinkingFunc in Jarvis Config will be called with each token.
+func WithReasoningEffort(effort string) OptionFunc {
+	return func(o *Options) { o.ReasoningEffort = effort }
 }

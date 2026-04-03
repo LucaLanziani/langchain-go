@@ -154,6 +154,18 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 				ch <- core.StreamChunk[*core.AIMessage]{Value: msg}
 			}
 
+		case copilot.AssistantReasoningDelta:
+			// Emit reasoning tokens with the same AdditionalKwargs["thinking"] key
+			// used by the Anthropic provider so callers handle them uniformly.
+			if event.Data.ReasoningText != nil && *event.Data.ReasoningText != "" {
+				msg := core.NewAIMessage("")
+				if msg.AdditionalKwargs == nil {
+					msg.AdditionalKwargs = make(map[string]any)
+				}
+				msg.AdditionalKwargs["thinking"] = *event.Data.ReasoningText
+				ch <- core.StreamChunk[*core.AIMessage]{Value: msg}
+			}
+
 		case copilot.AssistantMessage:
 			// Don't repeat content — deltas already delivered it token by token.
 			msg := core.NewAIMessage("")
@@ -266,6 +278,10 @@ func (m *ChatModel) buildSessionConfig(ctx context.Context, messages []core.Mess
 		InfiniteSessions: &copilot.InfiniteSessionConfig{
 			Enabled: copilot.Bool(false),
 		},
+	}
+
+	if m.opts.ReasoningEffort != "" {
+		sessionCfg.ReasoningEffort = m.opts.ReasoningEffort
 	}
 
 	// Extract system message and configure it.
