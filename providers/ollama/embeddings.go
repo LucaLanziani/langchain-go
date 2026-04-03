@@ -15,9 +15,7 @@ type Embeddings struct {
 
 // NewEmbeddings creates a new Ollama Embeddings instance.
 func NewEmbeddings(optFns ...OptionFunc) *Embeddings {
-	o := defaultOptions()
-	// Default embedding model
-	o.Model = "nomic-embed-text"
+	o := defaultEmbeddingOptions()
 	for _, fn := range optFns {
 		fn(o)
 	}
@@ -34,23 +32,14 @@ func (e *Embeddings) EmbedDocuments(ctx context.Context, texts []string) ([][]fl
 		Input:     texts,
 		KeepAlive: e.opts.KeepAlive,
 	}
-
-	reqJSON, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("ollama: failed to marshal embed request: %w", err)
-	}
-
-	cm := &ChatModel{opts: e.opts, client: e.client}
-	respBody, err := cm.doRequest(ctx, "/api/embed", json.RawMessage(reqJSON))
+	respBody, err := doPost(ctx, e.client, e.opts.BaseURL+"/api/embed", req)
 	if err != nil {
 		return nil, err
 	}
-
 	var resp embedResponse
 	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return nil, fmt.Errorf("ollama: failed to parse embed response: %w", err)
+		return nil, fmt.Errorf("ollama: parse embed response: %w", err)
 	}
-
 	return resp.Embeddings, nil
 }
 

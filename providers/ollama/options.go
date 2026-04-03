@@ -34,11 +34,19 @@ type options struct {
 	KeepAlive string
 }
 
-// defaultOptions returns sensible defaults for the Ollama provider.
+// defaultOptions returns sensible defaults for the Ollama chat provider.
 func defaultOptions() *options {
 	return &options{
 		BaseURL: "http://localhost:11434",
 		Model:   "llama3.1",
+	}
+}
+
+// defaultEmbeddingOptions returns sensible defaults for the Ollama embeddings provider.
+func defaultEmbeddingOptions() *options {
+	return &options{
+		BaseURL: "http://localhost:11434",
+		Model:   "nomic-embed-text",
 	}
 }
 

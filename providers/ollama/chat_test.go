@@ -145,12 +145,12 @@ func TestMessageToOllama_AIWithToolCalls(t *testing.T) {
 
 func TestGetName(t *testing.T) {
 	m := New()
-	if m.GetName() != "ChatOllama" {
-		t.Errorf("expected 'ChatOllama', got %q", m.GetName())
+	if m.GetName() != "ChatOllama/llama3.1" {
+		t.Errorf("expected 'ChatOllama/llama3.1', got %q", m.GetName())
 	}
-	m.name = "MyModel"
-	if m.GetName() != "MyModel" {
-		t.Errorf("expected 'MyModel', got %q", m.GetName())
+	m2 := New(WithModel("mistral"))
+	if m2.GetName() != "ChatOllama/mistral" {
+		t.Errorf("expected 'ChatOllama/mistral', got %q", m2.GetName())
 	}
 }
 
@@ -533,8 +533,48 @@ func TestEmbedQuery_EmptyResponse(t *testing.T) {
 	}
 }
 
-// ---------- interface check ----------
+// ---------- Stream usage metadata ----------
 
-func TestChatModelImplementsInterface(t *testing.T) {
-	var _ llms.ChatModel = (*ChatModel)(nil)
+func TestStream_UsageMetadata(t *testing.T) {
+	chunks := []streamChunk{
+		{Message: ollamaMessage{Role: "assistant", Content: "hi"}, Done: false},
+		{Message: ollamaMessage{Role: "assistant", Content: ""}, Done: true, PromptEvalCount: 7, EvalCount: 3},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, chunk := range chunks {
+			data, _ := json.Marshal(chunk)
+			fmt.Fprintf(w, "%s\n", data)
+		}
+	}))
+	defer srv.Close()
+
+	m := newTestModel(srv)
+	iter, err := m.Stream(context.Background(), []core.Message{core.NewHumanMessage("hello")})
+	if err != nil {
+		t.Fatalf("Stream error: %v", err)
+	}
+
+	var usageMsg *core.AIMessage
+	for {
+		msg, ok, err := iter.Next()
+		if err != nil {
+			t.Fatalf("stream error: %v", err)
+		}
+		if !ok {
+			break
+		}
+		if msg.UsageMetadata != nil {
+			usageMsg = msg
+		}
+	}
+
+	if usageMsg == nil {
+		t.Fatal("expected a chunk with usage metadata")
+	}
+	if usageMsg.UsageMetadata.InputTokens != 7 {
+		t.Errorf("expected 7 input tokens, got %d", usageMsg.UsageMetadata.InputTokens)
+	}
+	if usageMsg.UsageMetadata.OutputTokens != 3 {
+		t.Errorf("expected 3 output tokens, got %d", usageMsg.UsageMetadata.OutputTokens)
+	}
 }

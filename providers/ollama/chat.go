@@ -2,13 +2,12 @@ package ollama
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"sync"
 
 	"github.com/LucaLanziani/langchain-go/core"
 	"github.com/LucaLanziani/langchain-go/llms"
@@ -23,7 +22,6 @@ type ChatModel struct {
 	client           *http.Client
 	boundTools       []llms.ToolDefinition
 	structuredSchema map[string]any
-	name             string
 }
 
 // New creates a new Ollama ChatModel with the provided options.
@@ -38,12 +36,9 @@ func New(optFns ...OptionFunc) *ChatModel {
 	}
 }
 
-// GetName returns the name of this model.
+// GetName returns the model identifier.
 func (m *ChatModel) GetName() string {
-	if m.name != "" {
-		return m.name
-	}
-	return "ChatOllama"
+	return "ChatOllama/" + m.opts.Model
 }
 
 // BindTools returns a copy of the model with the given tools bound.
@@ -76,12 +71,10 @@ func (m *ChatModel) Invoke(ctx context.Context, input []core.Message, opts ...co
 func (m *ChatModel) Generate(ctx context.Context, messages []core.Message, opts ...core.Option) (*llms.ChatResult, error) {
 	cfg := core.ApplyOptions(opts...)
 	req := m.buildRequest(messages, cfg, false)
-
-	respBody, err := m.doRequest(ctx, "/api/chat", req)
+	respBody, err := doPost(ctx, m.client, m.opts.BaseURL+"/api/chat", req)
 	if err != nil {
 		return nil, err
 	}
-
 	return m.parseResponse(respBody)
 }
 
@@ -90,57 +83,60 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 	cfg := core.ApplyOptions(opts...)
 	req := m.buildRequest(input, cfg, true)
 
-	reqJSON, err := json.Marshal(req)
+	resp, err := doRawPost(ctx, m.client, m.opts.BaseURL+"/api/chat", req)
 	if err != nil {
-		return nil, fmt.Errorf("ollama: failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, m.opts.BaseURL+"/api/chat", bytes.NewReader(reqJSON))
-	if err != nil {
-		return nil, fmt.Errorf("ollama: failed to create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := m.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("ollama: request failed: %w", err)
+		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return nil, fmt.Errorf("ollama: API error (status %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("ollama: status %d: %s", resp.StatusCode, body)
 	}
 
 	ch := make(chan core.StreamChunk[*core.AIMessage], streamBufferSize)
 	go func() {
 		defer close(ch)
 		defer resp.Body.Close()
-		m.streamResponse(resp.Body, ch)
+		streamResponse(resp.Body, ch)
 	}()
 
 	return core.NewStreamIterator(ch), nil
 }
 
-// Batch performs multiple Invoke calls sequentially.
+// Batch performs multiple Invoke calls concurrently, preserving input order.
 func (m *ChatModel) Batch(ctx context.Context, inputs [][]core.Message, opts ...core.Option) ([]*core.AIMessage, error) {
-	results := make([]*core.AIMessage, len(inputs))
-	for i, input := range inputs {
-		result, err := m.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("ollama: batch item %d: %w", i, err)
-		}
-		results[i] = result
+	type result struct {
+		msg *core.AIMessage
+		err error
 	}
-	return results, nil
+	results := make([]result, len(inputs))
+	var wg sync.WaitGroup
+	for i, input := range inputs {
+		i, input := i, input
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			msg, err := m.Invoke(ctx, input, opts...)
+			results[i] = result{msg, err}
+		}()
+	}
+	wg.Wait()
+
+	msgs := make([]*core.AIMessage, len(inputs))
+	for i, r := range results {
+		if r.err != nil {
+			return nil, fmt.Errorf("ollama: batch item %d: %w", i, r.err)
+		}
+		msgs[i] = r.msg
+	}
+	return msgs, nil
 }
 
 // buildRequest constructs the Ollama /api/chat request body.
 func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConfig, stream bool) *chatRequest {
 	model := m.opts.Model
-	if v, ok := cfg.Configurable[llms.ConfigKeyModel]; ok {
-		if s, ok := v.(string); ok {
-			model = s
-		}
+	if s, ok := configGet[string](cfg, llms.ConfigKeyModel); ok {
+		model = s
 	}
 
 	ollamaMsgs := make([]ollamaMessage, 0, len(messages))
@@ -148,21 +144,11 @@ func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConf
 		ollamaMsgs = append(ollamaMsgs, messageToOllama(msg))
 	}
 
-	req := &chatRequest{
-		Model:     model,
-		Messages:  ollamaMsgs,
-		Stream:    stream,
-		KeepAlive: m.opts.KeepAlive,
-	}
-
-	// Format
 	format := m.opts.Format
 	if m.structuredSchema != nil {
 		format = "json"
 	}
-	req.Format = format
 
-	// Build model options
 	mopts := &modelOptions{
 		Temperature: m.opts.Temperature,
 		TopP:        m.opts.TopP,
@@ -170,37 +156,33 @@ func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConf
 		NumPredict:  m.opts.NumPredict,
 		NumCtx:      m.opts.NumCtx,
 	}
-
-	// Override with per-call options
-	if temp, ok := cfg.Configurable[llms.ConfigKeyTemperature]; ok {
-		if f, ok := temp.(float64); ok {
-			mopts.Temperature = &f
-		}
+	if f, ok := configGet[float64](cfg, llms.ConfigKeyTemperature); ok {
+		mopts.Temperature = &f
 	}
-	if mt, ok := cfg.Configurable[llms.ConfigKeyMaxTokens]; ok {
-		if n, ok := mt.(int); ok {
-			mopts.NumPredict = &n
-		}
+	if n, ok := configGet[int](cfg, llms.ConfigKeyMaxTokens); ok {
+		mopts.NumPredict = &n
 	}
-	if tp, ok := cfg.Configurable[llms.ConfigKeyTopP]; ok {
-		if f, ok := tp.(float64); ok {
-			mopts.TopP = &f
-		}
+	if f, ok := configGet[float64](cfg, llms.ConfigKeyTopP); ok {
+		mopts.TopP = &f
+	}
+	mopts.Stop = cfg.Stop
+	if len(mopts.Stop) == 0 {
+		mopts.Stop = m.opts.Stop
 	}
 
-	stop := cfg.Stop
-	if len(stop) == 0 {
-		stop = m.opts.Stop
+	req := &chatRequest{
+		Model:     model,
+		Messages:  ollamaMsgs,
+		Stream:    stream,
+		Format:    format,
+		KeepAlive: m.opts.KeepAlive,
 	}
-	mopts.Stop = stop
 
-	// Only include options block if at least one field is set
 	if mopts.Temperature != nil || mopts.TopP != nil || mopts.TopK != nil ||
 		mopts.NumPredict != nil || mopts.NumCtx != nil || len(mopts.Stop) > 0 {
 		req.Options = mopts
 	}
 
-	// Tools
 	if len(m.boundTools) > 0 {
 		tools := make([]ollamaTool, len(m.boundTools))
 		for i, t := range m.boundTools {
@@ -219,42 +201,11 @@ func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConf
 	return req
 }
 
-// doRequest sends an HTTP POST request and returns the response body.
-func (m *ChatModel) doRequest(ctx context.Context, path string, body any) ([]byte, error) {
-	reqJSON, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("ollama: failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.opts.BaseURL+path, bytes.NewReader(reqJSON))
-	if err != nil {
-		return nil, fmt.Errorf("ollama: failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := m.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("ollama: request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("ollama: failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ollama: API error (status %d): %s", resp.StatusCode, string(respBody))
-	}
-
-	return respBody, nil
-}
-
 // parseResponse parses the non-streaming /api/chat response.
 func (m *ChatModel) parseResponse(body []byte) (*llms.ChatResult, error) {
 	var resp chatResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("ollama: failed to parse response: %w", err)
+		return nil, fmt.Errorf("ollama: parse response: %w", err)
 	}
 
 	aiMsg := core.NewAIMessage(resp.Message.Content)
@@ -287,17 +238,12 @@ func (m *ChatModel) parseResponse(body []byte) (*llms.ChatResult, error) {
 	result := &llms.ChatResult{
 		Generations: []*llms.ChatGeneration{
 			{
-				Message: aiMsg,
-				GenerationInfo: map[string]any{
-					"done_reason": resp.DoneReason,
-				},
+				Message:        aiMsg,
+				GenerationInfo: map[string]any{"done_reason": resp.DoneReason},
 			},
 		},
-		LLMOutput: map[string]any{
-			"model": resp.Model,
-		},
+		LLMOutput: map[string]any{"model": resp.Model},
 	}
-
 	if totalTokens > 0 {
 		result.LLMOutput["token_usage"] = llms.TokenUsage{
 			PromptTokens:     resp.PromptEvalCount,
@@ -309,28 +255,29 @@ func (m *ChatModel) parseResponse(body []byte) (*llms.ChatResult, error) {
 	return result, nil
 }
 
-// streamResponse reads NDJSON lines from an Ollama streaming response.
-func (m *ChatModel) streamResponse(body io.Reader, ch chan<- core.StreamChunk[*core.AIMessage]) {
+// streamResponse reads NDJSON lines from an Ollama streaming response and sends
+// chunks to ch. Content tokens are sent as they arrive. A final chunk with
+// accumulated tool calls and/or usage metadata is sent when the stream is done.
+func streamResponse(body io.Reader, ch chan<- core.StreamChunk[*core.AIMessage]) {
 	scanner := bufio.NewScanner(body)
-	var contentBuilder strings.Builder
+	var contentBuilder []byte
 	var toolCallBuilders []ollamaToolCall
 
 	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
+		line := scanner.Bytes()
+		if len(line) == 0 {
 			continue
 		}
 
 		var chunk streamChunk
-		if err := json.Unmarshal([]byte(line), &chunk); err != nil {
-			ch <- core.StreamChunk[*core.AIMessage]{Err: fmt.Errorf("ollama: failed to parse stream chunk: %w", err)}
+		if err := json.Unmarshal(line, &chunk); err != nil {
+			ch <- core.StreamChunk[*core.AIMessage]{Err: fmt.Errorf("ollama: parse stream chunk: %w", err)}
 			return
 		}
 
 		if chunk.Message.Content != "" {
-			contentBuilder.WriteString(chunk.Message.Content)
-			msg := core.NewAIMessage(chunk.Message.Content)
-			ch <- core.StreamChunk[*core.AIMessage]{Value: msg}
+			contentBuilder = append(contentBuilder, chunk.Message.Content...)
+			ch <- core.StreamChunk[*core.AIMessage]{Value: core.NewAIMessage(chunk.Message.Content)}
 		}
 
 		if len(chunk.Message.ToolCalls) > 0 {
@@ -338,9 +285,9 @@ func (m *ChatModel) streamResponse(body io.Reader, ch chan<- core.StreamChunk[*c
 		}
 
 		if chunk.Done {
-			// Send a final message with accumulated tool calls, if any.
+			var toolCalls []core.ToolCall
 			if len(toolCallBuilders) > 0 {
-				toolCalls := make([]core.ToolCall, len(toolCallBuilders))
+				toolCalls = make([]core.ToolCall, len(toolCallBuilders))
 				for i, tc := range toolCallBuilders {
 					toolCalls[i] = core.ToolCall{
 						Name: tc.Function.Name,
@@ -348,7 +295,17 @@ func (m *ChatModel) streamResponse(body io.Reader, ch chan<- core.StreamChunk[*c
 						Type: "function",
 					}
 				}
-				msg := core.NewAIMessageWithToolCalls(contentBuilder.String(), toolCalls)
+			}
+			total := chunk.PromptEvalCount + chunk.EvalCount
+			if len(toolCalls) > 0 || total > 0 {
+				msg := core.NewAIMessageWithToolCalls("", toolCalls)
+				if total > 0 {
+					msg.UsageMetadata = &core.UsageMetadata{
+						InputTokens:  chunk.PromptEvalCount,
+						OutputTokens: chunk.EvalCount,
+						TotalTokens:  total,
+					}
+				}
 				ch <- core.StreamChunk[*core.AIMessage]{Value: msg}
 			}
 			return
@@ -356,15 +313,13 @@ func (m *ChatModel) streamResponse(body io.Reader, ch chan<- core.StreamChunk[*c
 	}
 
 	if err := scanner.Err(); err != nil {
-		ch <- core.StreamChunk[*core.AIMessage]{Err: fmt.Errorf("ollama: stream read error: %w", err)}
+		ch <- core.StreamChunk[*core.AIMessage]{Err: fmt.Errorf("ollama: stream read: %w", err)}
 	}
 }
 
 // messageToOllama converts a core.Message to the Ollama message format.
 func messageToOllama(msg core.Message) ollamaMessage {
-	om := ollamaMessage{
-		Content: msg.GetContent(),
-	}
+	om := ollamaMessage{Content: msg.GetContent()}
 
 	switch msg.GetType() {
 	case core.MessageTypeHuman:
@@ -374,12 +329,7 @@ func messageToOllama(msg core.Message) ollamaMessage {
 		if ai, ok := msg.(*core.AIMessage); ok && len(ai.ToolCalls) > 0 {
 			tc := make([]ollamaToolCall, len(ai.ToolCalls))
 			for i, c := range ai.ToolCalls {
-				tc[i] = ollamaToolCall{
-					Function: ollamaToolCallFunction{
-						Name:      c.Name,
-						Arguments: c.Args,
-					},
-				}
+				tc[i] = ollamaToolCall{Function: ollamaToolCallFunction{Name: c.Name, Arguments: c.Args}}
 			}
 			om.ToolCalls = tc
 		}
@@ -395,6 +345,17 @@ func messageToOllama(msg core.Message) ollamaMessage {
 	}
 
 	return om
+}
+
+// configGet extracts a typed value from cfg.Configurable.
+func configGet[T any](cfg *core.RunnableConfig, key string) (T, bool) {
+	v, ok := cfg.Configurable[key]
+	if !ok {
+		var zero T
+		return zero, false
+	}
+	t, ok := v.(T)
+	return t, ok
 }
 
 // Ensure ChatModel implements llms.ChatModel.
