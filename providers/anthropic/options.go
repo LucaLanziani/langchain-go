@@ -23,6 +23,12 @@ type Options struct {
 
 	// Stop sequences.
 	Stop []string
+
+	// ThinkingBudget, when > 0, enables Anthropic Extended Thinking and sets
+	// the maximum number of tokens the model may use for its internal reasoning.
+	// Requires a model that supports extended thinking (e.g. claude-3-7-sonnet-*).
+	// When enabled the API enforces temperature=1 and disables top_p/top_k.
+	ThinkingBudget int
 }
 
 // DefaultOptions returns sensible defaults.
@@ -55,4 +61,11 @@ func WithBaseURL(url string) OptionFunc {
 // WithMaxTokens sets the maximum tokens.
 func WithMaxTokens(n int) OptionFunc {
 	return func(o *Options) { o.MaxTokens = n }
+}
+
+// WithThinkingBudget enables Anthropic Extended Thinking with the given token budget.
+// Set to 0 (default) to disable. The budget must be less than MaxTokens.
+// When enabled, temperature is forced to 1 per the Anthropic API requirement.
+func WithThinkingBudget(budget int) OptionFunc {
+	return func(o *Options) { o.ThinkingBudget = budget }
 }

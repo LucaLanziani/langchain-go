@@ -201,6 +201,18 @@ func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConf
 		req["stop_sequences"] = stop
 	}
 
+	// Extended Thinking: when enabled, temperature must be 1 and top_p/top_k
+	// must not be set (Anthropic API requirement).
+	if m.opts.ThinkingBudget > 0 {
+		req["thinking"] = map[string]any{
+			"type":         "enabled",
+			"budget_tokens": m.opts.ThinkingBudget,
+		}
+		req["temperature"] = 1 // forced; overrides any Temperature option
+		delete(req, "top_p")
+		delete(req, "top_k")
+	}
+
 	// Tools
 	if len(m.boundTools) > 0 {
 		tools := make([]map[string]any, len(m.boundTools))
@@ -308,6 +320,10 @@ func (m *ChatModel) setHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", m.opts.APIKey)
 	req.Header.Set("anthropic-version", anthropicAPIVersion)
+	if m.opts.ThinkingBudget > 0 {
+		// Required beta for extended thinking (streaming interleaved thinking blocks).
+		req.Header.Set("anthropic-beta", "interleaved-thinking-2025-05-14")
+	}
 }
 
 // parseResponse parses the Anthropic messages API response.
@@ -411,6 +427,16 @@ func (m *ChatModel) streamResponse(body io.Reader, ch chan<- core.StreamChunk[*c
 					msg := core.NewAIMessage(event.Delta.Text)
 					ch <- core.StreamChunk[*core.AIMessage]{Value: msg}
 
+				case "thinking_delta":
+					// Emit the thinking chunk with a metadata flag so callers
+					// can distinguish it from the main response text.
+					msg := core.NewAIMessage("")
+					if msg.AdditionalKwargs == nil {
+						msg.AdditionalKwargs = make(map[string]any)
+					}
+					msg.AdditionalKwargs["thinking"] = event.Delta.Thinking
+					ch <- core.StreamChunk[*core.AIMessage]{Value: msg}
+
 				case "input_json_delta":
 					if currentToolCall != nil {
 						currentToolCall.args += event.Delta.PartialJSON
@@ -479,6 +505,7 @@ type anthropicStreamEvent struct {
 type anthropicDelta struct {
 	Type        string `json:"type,omitempty"`
 	Text        string `json:"text,omitempty"`
+	Thinking    string `json:"thinking,omitempty"`
 	PartialJSON string `json:"partial_json,omitempty"`
 }
 
