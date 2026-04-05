@@ -48,7 +48,7 @@ func New(ctx context.Context, optFns ...OptionFunc) (*ChatModel, error) {
 		LogLevel: opts.LogLevel,
 	}
 	if opts.GithubToken != "" {
-		clientOpts.GithubToken = opts.GithubToken
+		clientOpts.GitHubToken = opts.GithubToken
 	}
 	if opts.CLIPath != "" {
 		clientOpts.CLIPath = opts.CLIPath
@@ -148,13 +148,13 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 
 	session.On(func(event copilot.SessionEvent) {
 		switch event.Type {
-		case copilot.AssistantMessageDelta:
+		case copilot.SessionEventTypeAssistantMessageDelta:
 			if event.Data.DeltaContent != nil {
 				msg := core.NewAIMessage(*event.Data.DeltaContent)
 				ch <- core.StreamChunk[*core.AIMessage]{Value: msg}
 			}
 
-		case copilot.AssistantReasoningDelta:
+		case copilot.SessionEventTypeAssistantReasoningDelta:
 			// Emit reasoning tokens with the same AdditionalKwargs["thinking"] key
 			// used by the Anthropic provider so callers handle them uniformly.
 			if event.Data.ReasoningText != nil && *event.Data.ReasoningText != "" {
@@ -166,7 +166,7 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 				ch <- core.StreamChunk[*core.AIMessage]{Value: msg}
 			}
 
-		case copilot.AssistantMessage:
+		case copilot.SessionEventTypeAssistantMessage:
 			// Don't repeat content — deltas already delivered it token by token.
 			msg := core.NewAIMessage("")
 			if event.Data.InputTokens != nil || event.Data.OutputTokens != nil {
@@ -186,7 +186,7 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 			}
 			ch <- core.StreamChunk[*core.AIMessage]{Value: msg}
 
-		case copilot.SessionError:
+		case copilot.SessionEventTypeSessionError:
 			errMsg := "unknown error"
 			if event.Data.Message != nil {
 				errMsg = *event.Data.Message
@@ -195,7 +195,7 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 				Err: fmt.Errorf("copilot: session error: %s", errMsg),
 			}
 
-		case copilot.SessionIdle:
+		case copilot.SessionEventTypeSessionIdle:
 			close(done)
 		}
 	})
