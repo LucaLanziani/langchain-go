@@ -116,7 +116,7 @@ func (m *ChatModel) Generate(ctx context.Context, messages []core.Message, opts 
 	if err != nil {
 		return nil, fmt.Errorf("copilot: failed to create session: %w", err)
 	}
-	defer session.Destroy()
+	defer session.Disconnect()
 
 	prompt := messagesToPrompt(messages)
 	response, err := session.SendAndWait(ctx, copilot.MessageOptions{
@@ -329,6 +329,11 @@ func (m *ChatModel) buildSessionConfig(ctx context.Context, messages []core.Mess
 
 	if len(sdkTools) > 0 {
 		sessionCfg.Tools = sdkTools
+	}
+
+	// Set permission handler if provided.
+	if m.opts.OnPermissionRequest != nil {
+		sessionCfg.OnPermissionRequest = m.opts.OnPermissionRequest
 	}
 
 	return sessionCfg

@@ -322,6 +322,30 @@ func TestBuildSessionConfig(t *testing.T) {
 			t.Errorf("expected model 'claude-sonnet-4.5', got %q", sessionCfg.Model)
 		}
 	})
+
+	t.Run("with permission handler", func(t *testing.T) {
+		handler := func(req copilot.PermissionRequest, inv copilot.PermissionInvocation) (copilot.PermissionRequestResult, error) {
+			return copilot.PermissionRequestResult{
+				Kind: copilot.PermissionRequestResultKindApproved,
+			}, nil
+		}
+
+		model := &ChatModel{
+			opts: &Options{
+				Model:               "gpt-5-mini",
+				OnPermissionRequest: handler,
+			},
+		}
+
+		messages := []core.Message{core.NewHumanMessage("hello")}
+		cfg := core.DefaultConfig()
+
+		sessionCfg := model.buildSessionConfig(ctx, messages, cfg)
+
+		if sessionCfg.OnPermissionRequest == nil {
+			t.Error("expected permission handler to be set in session config")
+		}
+	})
 }
 
 func TestBridgeTools(t *testing.T) {
@@ -559,6 +583,19 @@ func TestOptionFuncs(t *testing.T) {
 		}
 		if opts.Tools[0].Name() != "test" {
 			t.Errorf("expected tool name 'test', got %q", opts.Tools[0].Name())
+		}
+	})
+
+	t.Run("WithPermissionHandler", func(t *testing.T) {
+		opts := DefaultOptions()
+		handler := func(req copilot.PermissionRequest, inv copilot.PermissionInvocation) (copilot.PermissionRequestResult, error) {
+			return copilot.PermissionRequestResult{
+				Kind: copilot.PermissionRequestResultKindApproved,
+			}, nil
+		}
+		WithPermissionHandler(handler)(opts)
+		if opts.OnPermissionRequest == nil {
+			t.Error("expected permission handler to be set")
 		}
 	})
 }

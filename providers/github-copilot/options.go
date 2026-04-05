@@ -1,7 +1,11 @@
 // Package copilot provides a GitHub Copilot chat model implementation using the Copilot SDK.
 package copilot
 
-import "github.com/LucaLanziani/langchain-go/tools"
+import (
+	copilot "github.com/github/copilot-sdk/go"
+
+	"github.com/LucaLanziani/langchain-go/tools"
+)
 
 // Options holds configuration for the GitHub Copilot chat model.
 type Options struct {
@@ -42,6 +46,11 @@ type Options struct {
 	// Only applies to models that support reasoning (e.g. gpt-5-mini, gpt-5).
 	// Empty string (default) disables the field and uses the model default.
 	ReasoningEffort string
+
+	// OnPermissionRequest is a handler for permission requests from the server.
+	// If nil, all permission requests are denied by default.
+	// Provide a handler to approve operations (file writes, shell commands, URL fetches, etc.).
+	OnPermissionRequest copilot.PermissionHandlerFunc
 }
 
 // DefaultOptions returns sensible defaults for the GitHub Copilot provider.
@@ -94,4 +103,11 @@ func WithTools(t ...tools.Tool) OptionFunc {
 // during streaming, and ThinkingFunc in Jarvis Config will be called with each token.
 func WithReasoningEffort(effort string) OptionFunc {
 	return func(o *Options) { o.ReasoningEffort = effort }
+}
+
+// WithPermissionHandler sets a custom permission handler for approving operations.
+// If not set, all permission requests are denied by default.
+// The handler is called for file writes, shell commands, URL fetches, and other operations.
+func WithPermissionHandler(handler copilot.PermissionHandlerFunc) OptionFunc {
+	return func(o *Options) { o.OnPermissionRequest = handler }
 }
