@@ -58,7 +58,9 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation error for field '%s': %s (value: %v)", e.Field, e.Message, e.Value)
+	// Sanitize sensitive field values
+	sanitizedValue := sanitizeValue(e.Field, e.Value)
+	return fmt.Sprintf("validation error for field '%s': %s (value: %v)", e.Field, e.Message, sanitizedValue)
 }
 
 // ProviderError wraps errors with provider context
@@ -67,13 +69,33 @@ type ProviderError struct {
 	ProviderName string
 	Operation    string
 	Err          error
+	// Additional context for debugging (never includes sensitive data)
+	Context map[string]string
 }
 
 func (e *ProviderError) Error() string {
+	var msg string
 	if e.ProviderName != "" {
-		return fmt.Sprintf("provider error [%s/%s] during %s: %v", e.ProviderType, e.ProviderName, e.Operation, e.Err)
+		msg = fmt.Sprintf("provider error [%s/%s] during %s: %v", e.ProviderType, e.ProviderName, e.Operation, e.Err)
+	} else {
+		msg = fmt.Sprintf("provider error [%s] during %s: %v", e.ProviderType, e.Operation, e.Err)
 	}
-	return fmt.Sprintf("provider error [%s] during %s: %v", e.ProviderType, e.Operation, e.Err)
+
+	// Add context if available
+	if len(e.Context) > 0 {
+		msg += " (context:"
+		first := true
+		for k, v := range e.Context {
+			if !first {
+				msg += ","
+			}
+			msg += fmt.Sprintf(" %s=%s", k, v)
+			first = false
+		}
+		msg += ")"
+	}
+
+	return msg
 }
 
 func (e *ProviderError) Unwrap() error {
@@ -82,12 +104,21 @@ func (e *ProviderError) Unwrap() error {
 
 // RoutingError wraps errors that occur during request routing
 type RoutingError struct {
-	Strategy string
-	Err      error
+	Strategy           string
+	AvailableProviders []string
+	RequestComplexity  string
+	Err                error
 }
 
 func (e *RoutingError) Error() string {
-	return fmt.Sprintf("routing error [strategy: %s]: %v", e.Strategy, e.Err)
+	msg := fmt.Sprintf("routing error [strategy: %s]: %v", e.Strategy, e.Err)
+	if len(e.AvailableProviders) > 0 {
+		msg += fmt.Sprintf(" (available providers: %v)", e.AvailableProviders)
+	}
+	if e.RequestComplexity != "" {
+		msg += fmt.Sprintf(" (request complexity: %s)", e.RequestComplexity)
+	}
+	return msg
 }
 
 func (e *RoutingError) Unwrap() error {
@@ -98,11 +129,20 @@ func (e *RoutingError) Unwrap() error {
 type FallbackError struct {
 	FailedProvider     string
 	AttemptedFallbacks []string
+	FallbackStrategy   string
 	Err                error
 }
 
 func (e *FallbackError) Error() string {
-	return fmt.Sprintf("fallback error after %s failed (attempted: %v): %v", e.FailedProvider, e.AttemptedFallbacks, e.Err)
+	msg := fmt.Sprintf("fallback error after %s failed", e.FailedProvider)
+	if e.FallbackStrategy != "" {
+		msg += fmt.Sprintf(" [strategy: %s]", e.FallbackStrategy)
+	}
+	if len(e.AttemptedFallbacks) > 0 {
+		msg += fmt.Sprintf(" (attempted: %v)", e.AttemptedFallbacks)
+	}
+	msg += fmt.Sprintf(": %v", e.Err)
+	return msg
 }
 
 func (e *FallbackError) Unwrap() error {
@@ -125,6 +165,24 @@ func NewProviderError(providerType ProviderType, providerName, operation string,
 		ProviderName: providerName,
 		Operation:    operation,
 		Err:          err,
+		Context:      make(map[string]string),
+	}
+}
+
+// NewProviderErrorWithContext creates a new provider error with additional context
+func NewProviderErrorWithContext(providerType ProviderType, providerName, operation string, err error, context map[string]string) error {
+	// Sanitize context to ensure no sensitive information
+	sanitizedContext := make(map[string]string)
+	for k, v := range context {
+		sanitizedContext[k] = sanitizeContextValue(k, v)
+	}
+
+	return &ProviderError{
+		ProviderType: providerType,
+		ProviderName: providerName,
+		Operation:    operation,
+		Err:          err,
+		Context:      sanitizedContext,
 	}
 }
 
@@ -136,6 +194,16 @@ func NewRoutingError(strategy string, err error) error {
 	}
 }
 
+// NewRoutingErrorWithContext creates a new routing error with additional context
+func NewRoutingErrorWithContext(strategy string, availableProviders []string, requestComplexity string, err error) error {
+	return &RoutingError{
+		Strategy:           strategy,
+		AvailableProviders: availableProviders,
+		RequestComplexity:  requestComplexity,
+		Err:                err,
+	}
+}
+
 // NewFallbackError creates a new fallback error
 func NewFallbackError(failedProvider string, attemptedFallbacks []string, err error) error {
 	return &FallbackError{
@@ -143,4 +211,100 @@ func NewFallbackError(failedProvider string, attemptedFallbacks []string, err er
 		AttemptedFallbacks: attemptedFallbacks,
 		Err:                err,
 	}
+}
+
+// NewFallbackErrorWithStrategy creates a new fallback error with strategy information
+func NewFallbackErrorWithStrategy(failedProvider string, attemptedFallbacks []string, fallbackStrategy string, err error) error {
+	return &FallbackError{
+		FailedProvider:     failedProvider,
+		AttemptedFallbacks: attemptedFallbacks,
+		FallbackStrategy:   fallbackStrategy,
+		Err:                err,
+	}
+}
+
+// sanitizeValue sanitizes field values to prevent exposure of sensitive information
+func sanitizeValue(fieldName string, value any) any {
+	if value == nil {
+		return nil
+	}
+
+	// List of sensitive field names (case-insensitive check)
+	sensitiveFields := []string{"apikey", "api_key", "token", "password", "secret", "credential", "auth"}
+
+	fieldLower := ""
+	if fieldName != "" {
+		fieldLower = fmt.Sprintf("%v", fieldName)
+		// Simple lowercase conversion for ASCII
+		fieldLower = toLower(fieldLower)
+	}
+
+	// Check if field name contains sensitive keywords
+	for _, sensitive := range sensitiveFields {
+		if contains(fieldLower, sensitive) {
+			return "[REDACTED]"
+		}
+	}
+
+	return value
+}
+
+// sanitizeContextValue sanitizes context values to prevent exposure of sensitive information
+func sanitizeContextValue(key, value string) string {
+	// List of sensitive context keys
+	sensitiveKeys := []string{"apikey", "api_key", "token", "password", "secret", "credential", "auth", "authorization"}
+
+	keyLower := toLower(key)
+
+	// Check if key contains sensitive keywords
+	for _, sensitive := range sensitiveKeys {
+		if contains(keyLower, sensitive) {
+			return "[REDACTED]"
+		}
+	}
+
+	return value
+}
+
+// toLower converts ASCII string to lowercase (simple implementation)
+func toLower(s string) string {
+	result := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			result[i] = c + ('a' - 'A')
+		} else {
+			result[i] = c
+		}
+	}
+	return string(result)
+}
+
+// contains checks if string s contains substring substr (case-sensitive)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && indexOfSubstring(s, substr) >= 0
+}
+
+// indexOfSubstring returns the index of substr in s, or -1 if not found
+func indexOfSubstring(s, substr string) int {
+	if len(substr) == 0 {
+		return 0
+	}
+	if len(substr) > len(s) {
+		return -1
+	}
+
+	for i := 0; i <= len(s)-len(substr); i++ {
+		match := true
+		for j := 0; j < len(substr); j++ {
+			if s[i+j] != substr[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
 }
