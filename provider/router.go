@@ -338,6 +338,7 @@ func (r *Router) getProvidersMap() map[string]llms.ChatModel {
 }
 
 // buildRequestContext creates a RequestContext from messages and options
+// Optimized to minimize allocations
 func buildRequestContext(messages []core.Message, opts []core.Option) RequestContext {
 	reqCtx := RequestContext{
 		Messages:     messages,
@@ -346,7 +347,7 @@ func buildRequestContext(messages []core.Message, opts []core.Option) RequestCon
 		HasToolCalls: false,
 		Priority:     "medium",
 		Complexity:   "moderate",
-		UserMetadata: make(map[string]any),
+		UserMetadata: nil, // Lazy initialization only if needed
 	}
 
 	// Estimate token count and check for tool calls
