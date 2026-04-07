@@ -17,7 +17,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Creating Router with Rule-Based Strategy ===\n")
+	fmt.Println("=== Creating Router with Rule-Based Strategy ===")
 
 	// Create router with three providers
 	router, err := provider.NewRouter(

@@ -18,7 +18,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Creating Router with Weighted Strategy ===\n")
+	fmt.Println("=== Creating Router with Weighted Strategy ===")
 
 	// Create router with three providers and different weights
 	router, err := provider.NewRouter(
@@ -68,7 +68,7 @@ func main() {
 	fmt.Println("  - fast-gpt35 (gpt-3.5-turbo): 70% weight")
 	fmt.Println("  - smart-gpt4 (gpt-4o-mini): 20% weight")
 	fmt.Println("  - local-ollama (llama3.2): 10% weight")
-	fmt.Println("\nMaking 20 requests to observe distribution...\n")
+	fmt.Println("\nMaking 20 requests to observe distribution...")
 
 	// Make 20 requests to see weighted distribution
 	successCount := 0

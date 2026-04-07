@@ -17,7 +17,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Creating Router with Fallback Strategy ===\n")
+	fmt.Println("=== Creating Router with Fallback Strategy ===")
 
 	// Create router with multiple providers and sequential fallback
 	// Note: Fallback is configured via inline RouterOption

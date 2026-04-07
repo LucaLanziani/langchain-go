@@ -20,7 +20,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== LLM-Based Routing Concept ===\n")
+	fmt.Println("=== LLM-Based Routing Concept ===")
 	fmt.Println("This example demonstrates intelligent routing using a custom strategy")
 	fmt.Println("that analyzes request characteristics to select the best provider.")
 	fmt.Println()

@@ -19,7 +19,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Creating Router for Concurrent Requests ===\n")
+	fmt.Println("=== Creating Router for Concurrent Requests ===")
 
 	// Create router with multiple providers
 	router, err := provider.NewRouter(

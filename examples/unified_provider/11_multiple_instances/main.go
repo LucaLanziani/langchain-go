@@ -18,7 +18,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Creating Router with Multiple OpenAI Instances ===\n")
+	fmt.Println("=== Creating Router with Multiple OpenAI Instances ===")
 
 	// Create router with three different OpenAI configurations
 	router, err := provider.NewRouter(

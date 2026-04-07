@@ -17,7 +17,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Creating Router with Multiple Providers ===\n")
+	fmt.Println("=== Creating Router with Multiple Providers ===")
 
 	// Create router with three providers
 	router, err := provider.NewRouter(
@@ -60,7 +60,7 @@ func main() {
 	fmt.Println("  - fast-openai (gpt-4o-mini)")
 	fmt.Println("  - smart-anthropic (claude-3-5-haiku)")
 	fmt.Println("  - local-ollama (llama3.2)")
-	fmt.Println("\nUsing SimpleStrategy to always route to 'fast-openai'\n")
+	fmt.Println("\nUsing SimpleStrategy to always route to 'fast-openai'")
 
 	// Make several requests - all will go to fast-openai
 	questions := []string{

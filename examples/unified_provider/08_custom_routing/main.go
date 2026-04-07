@@ -19,7 +19,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Creating Router with Custom Strategy ===\n")
+	fmt.Println("=== Creating Router with Custom Strategy ===")
 
 	// Create router with multiple providers
 	router, err := provider.NewRouter(

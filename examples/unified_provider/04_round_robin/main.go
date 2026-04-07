@@ -17,7 +17,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Creating Router with Round-Robin Strategy ===\n")
+	fmt.Println("=== Creating Router with Round-Robin Strategy ===")
 
 	// Create router with three providers
 	router, err := provider.NewRouter(
@@ -60,7 +60,7 @@ func main() {
 	fmt.Println("  - openai-1")
 	fmt.Println("  - openai-2")
 	fmt.Println("  - anthropic-1")
-	fmt.Println("\nUsing RoundRobinStrategy for even distribution\n")
+	fmt.Println("\nUsing RoundRobinStrategy for even distribution")
 
 	// Make 9 requests to see round-robin distribution
 	// Expected pattern: openai-1, openai-2, anthropic-1, openai-1, openai-2, anthropic-1, ...

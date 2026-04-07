@@ -17,7 +17,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== Creating Router with Load-Balanced Strategy ===\n")
+	fmt.Println("=== Creating Router with Load-Balanced Strategy ===")
 
 	// Create router with multiple providers
 	router, err := provider.NewRouter(
@@ -67,7 +67,7 @@ func main() {
 	fmt.Println()
 
 	// Make multiple requests and watch the load balancer adapt
-	fmt.Println("=== Making 15 Requests ===\n")
+	fmt.Println("=== Making 15 Requests ===")
 
 	for i := 1; i <= 15; i++ {
 		question := fmt.Sprintf("What is %d squared?", i)
