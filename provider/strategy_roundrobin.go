@@ -16,6 +16,13 @@ func (s *RoundRobinStrategy) SelectProvider(ctx context.Context, reqCtx RequestC
 		return "", ErrNoProvidersAvailable
 	}
 
+	// Fast path for single provider
+	if len(providers) == 1 {
+		for name := range providers {
+			return name, nil
+		}
+	}
+
 	// Get provider names in deterministic order
 	names := make([]string, 0, len(providers))
 	for name := range providers {

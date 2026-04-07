@@ -25,6 +25,13 @@ func (s *WeightedStrategy) SelectProvider(ctx context.Context, reqCtx RequestCon
 		return "", ErrNoProvidersAvailable
 	}
 
+	// Fast path for single provider
+	if len(providers) == 1 {
+		for name := range providers {
+			return name, nil
+		}
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
