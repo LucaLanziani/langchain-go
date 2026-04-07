@@ -45,6 +45,9 @@ var (
 
 	// ErrRouterClosed is returned when operations are attempted on a closed router
 	ErrRouterClosed = errors.New("router has been closed")
+
+	// ErrNoProvidersAvailable is returned when no providers are available for routing
+	ErrNoProvidersAvailable = errors.New("no providers available")
 )
 
 // ValidationError represents a configuration validation error

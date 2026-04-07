@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -139,6 +140,7 @@ type RoundRobinStrategy struct {
 type WeightedStrategy struct {
 	weights map[string]int
 	mu      sync.RWMutex
+	rng     *rand.Rand
 }
 
 // RuleBasedStrategy routes based on request characteristics
@@ -154,7 +156,9 @@ type LoadBalancedStrategy struct {
 
 // CustomStrategy allows user-defined routing logic
 type CustomStrategy struct {
-	SelectFunc func(ctx context.Context, reqCtx RequestContext, providers map[string]llms.ChatModel) (string, error)
+	SelectFunc    func(ctx context.Context, reqCtx RequestContext, providers map[string]llms.ChatModel) (string, error)
+	OnSuccessFunc func(ctx context.Context, providerName string, latency time.Duration)
+	OnErrorFunc   func(ctx context.Context, providerName string, err error)
 }
 
 // LLMRoutingStrategy uses an LLM to make routing decisions
