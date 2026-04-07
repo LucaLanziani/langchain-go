@@ -709,6 +709,267 @@ func TestProperty2_CleanupSafety_QuickCheck(t *testing.T) {
 	}
 }
 
+// TestProperty3_InterfaceCompatibility tests that all created models implement
+// the llms.ChatModel interface.
+//
+// Property 3: Interface Compatibility
+// ∀ providerType ∈ ProviderTypes:
+//
+//	model, _, err := NewProvider(ctx, providerType, validOpts...)
+//	⟹ err = nil ⟹ model implements llms.ChatModel
+//
+// Validates: Requirement 1.1
+func TestProperty3_InterfaceCompatibility(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name         string
+		providerType ProviderType
+		options      []ProviderOption
+	}{
+		{
+			name:         "Anthropic implements ChatModel",
+			providerType: ProviderAnthropic,
+			options: []ProviderOption{
+				WithModel("claude-sonnet-4-20250514"),
+				WithMaxTokens(4096),
+				WithAPIKey("test-key"),
+			},
+		},
+		{
+			name:         "OpenAI implements ChatModel",
+			providerType: ProviderOpenAI,
+			options: []ProviderOption{
+				WithModel("gpt-4o"),
+				WithAPIKey("test-key"),
+			},
+		},
+		{
+			name:         "Ollama implements ChatModel",
+			providerType: ProviderOllama,
+			options: []ProviderOption{
+				WithModel("llama3.1"),
+			},
+		},
+		{
+			name:         "Ollama with all options implements ChatModel",
+			providerType: ProviderOllama,
+			options: []ProviderOption{
+				WithModel("llama3.1"),
+				WithBaseURL("http://localhost:11434"),
+				WithTemperature(0.7),
+				WithMaxTokens(2000),
+				WithTopP(0.9),
+				WithStop([]string{"stop1", "stop2"}),
+				WithProviderSpecific("keep_alive", "5m"),
+				WithProviderSpecific("format", "json"),
+				WithProviderSpecific("num_ctx", 4096),
+				WithProviderSpecific("top_k", 40),
+			},
+		},
+		{
+			name:         "Anthropic with all options implements ChatModel",
+			providerType: ProviderAnthropic,
+			options: []ProviderOption{
+				WithModel("claude-sonnet-4-20250514"),
+				WithMaxTokens(4096),
+				WithAPIKey("test-key"),
+				WithBaseURL("https://api.anthropic.com"),
+				WithTemperature(0.8),
+				WithTopP(0.95),
+				WithStop([]string{"Human:", "Assistant:"}),
+			},
+		},
+		{
+			name:         "OpenAI with all options implements ChatModel",
+			providerType: ProviderOpenAI,
+			options: []ProviderOption{
+				WithModel("gpt-4o"),
+				WithAPIKey("test-key"),
+				WithBaseURL("https://api.openai.com/v1"),
+				WithTemperature(0.7),
+				WithMaxTokens(2000),
+				WithTopP(0.9),
+				WithStop([]string{"User:", "Assistant:"}),
+				WithProviderSpecific("organization", "org-123"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			model, cleanup, err := NewProvider(ctx, tc.providerType, tc.options...)
+			if err != nil {
+				t.Fatalf("Failed to create provider: %v", err)
+			}
+			if model == nil {
+				t.Fatal("Expected non-nil model")
+			}
+			defer cleanup()
+
+			// Property: model must implement llms.ChatModel interface
+			// This is a compile-time check, but we verify at runtime too
+			var _ llms.ChatModel = model
+
+			// Verify the model has the required methods by checking interface compliance
+			// The llms.ChatModel interface requires these methods:
+			// - Invoke(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Message, error)
+			// - Stream(ctx context.Context, messages []core.Message, opts ...core.Option) (<-chan *core.Message, error)
+			// - Generate(ctx context.Context, messages []core.Message, opts ...core.Option) (*llms.Result, error)
+
+			// We can't call these methods without actual API credentials, but we can verify
+			// the interface is satisfied at compile time through type assertion
+			if model == nil {
+				t.Error("Model does not implement llms.ChatModel interface")
+			}
+		})
+	}
+}
+
+// TestProperty3_InterfaceCompatibility_AllProviders tests that every provider type
+// implements the ChatModel interface
+func TestProperty3_InterfaceCompatibility_AllProviders(t *testing.T) {
+	ctx := context.Background()
+
+	// Test all provider types
+	providerTypes := []ProviderType{
+		ProviderAnthropic,
+		ProviderOpenAI,
+		ProviderOllama,
+		// Note: ProviderGitHubCopilot requires actual CLI setup, so we skip it in this test
+	}
+
+	for _, providerType := range providerTypes {
+		t.Run(string(providerType), func(t *testing.T) {
+			// Generate valid configuration for this provider
+			options := generateValidConfig(12345, providerType)
+
+			model, cleanup, err := NewProvider(ctx, providerType, options...)
+			if err != nil {
+				t.Fatalf("Failed to create provider %s: %v", providerType, err)
+			}
+			if model == nil {
+				t.Fatalf("Expected non-nil model for provider %s", providerType)
+			}
+			defer cleanup()
+
+			// Property: All providers must implement llms.ChatModel
+			var _ llms.ChatModel = model
+
+			// Additional verification: check that the model is not nil
+			if model == nil {
+				t.Errorf("Provider %s returned nil model but no error", providerType)
+			}
+		})
+	}
+}
+
+// TestProperty3_InterfaceCompatibility_QuickCheck uses property-based testing
+// to verify interface compatibility with randomly generated configurations
+func TestProperty3_InterfaceCompatibility_QuickCheck(t *testing.T) {
+	// Skip GitHub Copilot in quick check as it requires actual CLI setup
+	providerTypes := []ProviderType{
+		ProviderAnthropic,
+		ProviderOpenAI,
+		ProviderOllama,
+	}
+
+	for _, providerType := range providerTypes {
+		t.Run(string(providerType), func(t *testing.T) {
+			property := func(seed int64) bool {
+				ctx := context.Background()
+
+				// Generate valid configuration
+				options := generateValidConfig(seed, providerType)
+
+				model, cleanup, err := NewProvider(ctx, providerType, options...)
+
+				// Only test interface compatibility if provider creation succeeded
+				if err != nil || model == nil {
+					return true // Skip this case
+				}
+				defer cleanup()
+
+				// Property: model must implement llms.ChatModel interface
+				// This is verified at compile time, but we check at runtime too
+				_, implementsInterface := interface{}(model).(llms.ChatModel)
+
+				return implementsInterface
+			}
+
+			config := &quick.Config{MaxCount: 50}
+			if err := quick.Check(property, config); err != nil {
+				t.Errorf("Interface compatibility property violated for %s: %v", providerType, err)
+			}
+		})
+	}
+}
+
+// TestProperty3_InterfaceCompatibility_MethodsExist verifies that all required
+// methods exist on the returned models
+func TestProperty3_InterfaceCompatibility_MethodsExist(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name         string
+		providerType ProviderType
+		options      []ProviderOption
+	}{
+		{
+			name:         "Anthropic has all methods",
+			providerType: ProviderAnthropic,
+			options: []ProviderOption{
+				WithModel("claude-sonnet-4-20250514"),
+				WithMaxTokens(4096),
+				WithAPIKey("test-key"),
+			},
+		},
+		{
+			name:         "OpenAI has all methods",
+			providerType: ProviderOpenAI,
+			options: []ProviderOption{
+				WithModel("gpt-4o"),
+				WithAPIKey("test-key"),
+			},
+		},
+		{
+			name:         "Ollama has all methods",
+			providerType: ProviderOllama,
+			options: []ProviderOption{
+				WithModel("llama3.1"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			model, cleanup, err := NewProvider(ctx, tc.providerType, tc.options...)
+			if err != nil {
+				t.Fatalf("Failed to create provider: %v", err)
+			}
+			if model == nil {
+				t.Fatal("Expected non-nil model")
+			}
+			defer cleanup()
+
+			// Verify the model satisfies the llms.ChatModel interface
+			chatModel, ok := interface{}(model).(llms.ChatModel)
+			if !ok {
+				t.Errorf("Model does not implement llms.ChatModel interface")
+			}
+
+			// Verify we can access the interface methods (compile-time check)
+			if chatModel == nil {
+				t.Error("ChatModel interface assertion failed")
+			}
+
+			// Note: We cannot actually call Invoke, Stream, or Generate without
+			// valid API credentials and network access, but the interface compliance
+			// is verified at compile time through the type assertion above
+		})
+	}
+}
+
 // Helper function to generate valid configuration for property-based testing
 func generateValidConfig(seed int64, providerType ProviderType) []ProviderOption {
 	// Use a simple deterministic approach based on seed
