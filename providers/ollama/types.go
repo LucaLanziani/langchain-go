@@ -25,10 +25,10 @@ type modelOptions struct {
 
 // ollamaMessage represents a single message in the Ollama chat format.
 type ollamaMessage struct {
-	Role      string            `json:"role"`
-	Content   string            `json:"content"`
-	Images    []string          `json:"images,omitempty"`
-	ToolCalls []ollamaToolCall  `json:"tool_calls,omitempty"`
+	Role       string           `json:"role"`
+	Content    string           `json:"content"`
+	Images     []string         `json:"images,omitempty"`
+	ToolCalls  []ollamaToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
 }
 

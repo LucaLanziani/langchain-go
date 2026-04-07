@@ -65,23 +65,23 @@ func (BaseCallbackHandler) OnLLMStart(_ context.Context, _ []string, _ string, _
 }
 func (BaseCallbackHandler) OnChatModelStart(_ context.Context, _ []Message, _ string, _ string, _ map[string]any) {
 }
-func (BaseCallbackHandler) OnLLMNewToken(_ context.Context, _ string, _ string)               {}
-func (BaseCallbackHandler) OnLLMEnd(_ context.Context, _ *LLMResult, _ string)                {}
-func (BaseCallbackHandler) OnLLMError(_ context.Context, _ error, _ string)                   {}
+func (BaseCallbackHandler) OnLLMNewToken(_ context.Context, _ string, _ string) {}
+func (BaseCallbackHandler) OnLLMEnd(_ context.Context, _ *LLMResult, _ string)  {}
+func (BaseCallbackHandler) OnLLMError(_ context.Context, _ error, _ string)     {}
 func (BaseCallbackHandler) OnChainStart(_ context.Context, _ map[string]any, _ string, _ string, _ map[string]any) {
 }
-func (BaseCallbackHandler) OnChainEnd(_ context.Context, _ map[string]any, _ string)          {}
-func (BaseCallbackHandler) OnChainError(_ context.Context, _ error, _ string)                 {}
+func (BaseCallbackHandler) OnChainEnd(_ context.Context, _ map[string]any, _ string) {}
+func (BaseCallbackHandler) OnChainError(_ context.Context, _ error, _ string)        {}
 func (BaseCallbackHandler) OnToolStart(_ context.Context, _ string, _ string, _ string, _ string) {
 }
-func (BaseCallbackHandler) OnToolEnd(_ context.Context, _ string, _ string)                   {}
-func (BaseCallbackHandler) OnToolError(_ context.Context, _ error, _ string)                  {}
-func (BaseCallbackHandler) OnAgentAction(_ context.Context, _ AgentActionData, _ string)      {}
-func (BaseCallbackHandler) OnAgentFinish(_ context.Context, _ AgentFinishData, _ string)      {}
-func (BaseCallbackHandler) OnRetrieverStart(_ context.Context, _ string, _ string, _ string)  {}
-func (BaseCallbackHandler) OnRetrieverEnd(_ context.Context, _ []*Document, _ string)         {}
-func (BaseCallbackHandler) OnRetrieverError(_ context.Context, _ error, _ string)             {}
-func (BaseCallbackHandler) OnText(_ context.Context, _ string, _ string)                      {}
+func (BaseCallbackHandler) OnToolEnd(_ context.Context, _ string, _ string)                  {}
+func (BaseCallbackHandler) OnToolError(_ context.Context, _ error, _ string)                 {}
+func (BaseCallbackHandler) OnAgentAction(_ context.Context, _ AgentActionData, _ string)     {}
+func (BaseCallbackHandler) OnAgentFinish(_ context.Context, _ AgentFinishData, _ string)     {}
+func (BaseCallbackHandler) OnRetrieverStart(_ context.Context, _ string, _ string, _ string) {}
+func (BaseCallbackHandler) OnRetrieverEnd(_ context.Context, _ []*Document, _ string)        {}
+func (BaseCallbackHandler) OnRetrieverError(_ context.Context, _ error, _ string)            {}
+func (BaseCallbackHandler) OnText(_ context.Context, _ string, _ string)                     {}
 
 // Ensure BaseCallbackHandler implements CallbackHandler.
 var _ CallbackHandler = (*BaseCallbackHandler)(nil)
