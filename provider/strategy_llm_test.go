@@ -1637,3 +1637,726 @@ func TestProperty23_LLMRoutingDeterminismWithCache(t *testing.T) {
 		t.Logf("✓ Cache provided determinism ('%s') despite non-deterministic LLM (1 call, 20 cache hits)", firstProvider)
 	})
 }
+
+// ===== Unit Tests for LLM Routing Strategy =====
+// These tests validate specific scenarios and edge cases for Requirements 11.1-11.7, 23.1-23.5
+
+// TestLLMRouting_CacheHit tests that when a cache entry exists and is valid,
+// the cached provider is returned without calling the LLM.
+// Validates: Requirements 11.5, 11.6, 23.1, 23.2
+func TestLLMRouting_CacheHit(t *testing.T) {
+	ctx := context.Background()
+
+	// Create mock LLM
+	mockLLM := &mockLLMForRouting{
+		response:   "anthropic",
+		err:        nil,
+		shouldFail: false,
+	}
+
+	// Create available providers
+	providers := map[string]llms.ChatModel{
+		"openai":    &mockProviderForRouting{name: "openai"},
+		"anthropic": &mockProviderForRouting{name: "anthropic"},
+	}
+
+	// Create LLM routing strategy
+	strategy := &LLMRoutingStrategy{
+		model:     mockLLM,
+		providers: []string{"openai", "anthropic"},
+		providerDescriptions: map[string]string{
+			"openai":    "Fast and cost-effective",
+			"anthropic": "Highly capable",
+		},
+		cacheTTL: 5 * time.Minute,
+	}
+
+	// Create request context
+	reqCtx := RequestContext{
+		Messages: []core.Message{
+			core.NewHumanMessage("Test message"),
+		},
+		MessageCount: 1,
+		TotalTokens:  1000,
+		HasToolCalls: false,
+		Priority:     "medium",
+		Complexity:   "simple",
+	}
+
+	// First call - should call LLM and cache result
+	provider1, err := strategy.SelectProvider(ctx, reqCtx, providers)
+	if err != nil {
+		t.Fatalf("First SelectProvider call failed: %v", err)
+	}
+
+	if provider1 != "anthropic" {
+		t.Errorf("Expected 'anthropic', got '%s'", provider1)
+	}
+
+	// Verify LLM was called once
+	if mockLLM.GetInvocations() != 1 {
+		t.Errorf("Expected 1 LLM invocation, got %d", mockLLM.GetInvocations())
+	}
+
+	// Second call with same context - should use cache (no LLM call)
+	provider2, err := strategy.SelectProvider(ctx, reqCtx, providers)
+	if err != nil {
+		t.Fatalf("Second SelectProvider call failed: %v", err)
+	}
+
+	if provider2 != "anthropic" {
+		t.Errorf("Expected cached 'anthropic', got '%s'", provider2)
+	}
+
+	// Verify LLM was NOT called again (cache hit)
+	if mockLLM.GetInvocations() != 1 {
+		t.Errorf("Expected 1 LLM invocation (cache hit), got %d", mockLLM.GetInvocations())
+	}
+
+	t.Log("✓ Cache hit returned cached provider without calling LLM")
+}
+
+// TestLLMRouting_CacheMiss tests that when no cache entry exists,
+// the LLM is called to make a routing decision.
+// Validates: Requirements 11.1, 11.2, 23.1
+func TestLLMRouting_CacheMiss(t *testing.T) {
+	ctx := context.Background()
+
+	// Create mock LLM
+	mockLLM := &mockLLMForRouting{
+		response:   "openai",
+		err:        nil,
+		shouldFail: false,
+	}
+
+	// Create available providers
+	providers := map[string]llms.ChatModel{
+		"openai":    &mockProviderForRouting{name: "openai"},
+		"anthropic": &mockProviderForRouting{name: "anthropic"},
+	}
+
+	// Create LLM routing strategy
+	strategy := &LLMRoutingStrategy{
+		model:     mockLLM,
+		providers: []string{"openai", "anthropic"},
+		providerDescriptions: map[string]string{
+			"openai":    "Fast and cost-effective",
+			"anthropic": "Highly capable",
+		},
+		cacheTTL: 5 * time.Minute,
+	}
+
+	// Create request context
+	reqCtx := RequestContext{
+		Messages: []core.Message{
+			core.NewHumanMessage("Test message"),
+		},
+		MessageCount: 1,
+		TotalTokens:  2000,
+		HasToolCalls: false,
+		Priority:     "high",
+		Complexity:   "moderate",
+	}
+
+	// Call SelectProvider - should call LLM (cache miss)
+	provider, err := strategy.SelectProvider(ctx, reqCtx, providers)
+	if err != nil {
+		t.Fatalf("SelectProvider call failed: %v", err)
+	}
+
+	if provider != "openai" {
+		t.Errorf("Expected 'openai' from LLM, got '%s'", provider)
+	}
+
+	// Verify LLM was called
+	if mockLLM.GetInvocations() != 1 {
+		t.Errorf("Expected 1 LLM invocation (cache miss), got %d", mockLLM.GetInvocations())
+	}
+
+	t.Log("✓ Cache miss triggered LLM call and returned provider")
+}
+
+// TestLLMRouting_LLMFailureFallback tests that when the LLM call fails,
+// the strategy falls back gracefully to an available provider.
+// Validates: Requirement 11.4
+func TestLLMRouting_LLMFailureFallback(t *testing.T) {
+	ctx := context.Background()
+
+	// Create mock LLM that fails
+	mockLLM := &mockLLMForRouting{
+		response:     "openai",
+		err:          errors.New("LLM API error"),
+		shouldFail:   true,
+		failureCount: 999,
+	}
+
+	// Create available providers
+	providers := map[string]llms.ChatModel{
+		"openai":    &mockProviderForRouting{name: "openai"},
+		"anthropic": &mockProviderForRouting{name: "anthropic"},
+	}
+
+	// Create LLM routing strategy
+	strategy := &LLMRoutingStrategy{
+		model:     mockLLM,
+		providers: []string{"openai", "anthropic"},
+		providerDescriptions: map[string]string{
+			"openai":    "Fast and cost-effective",
+			"anthropic": "Highly capable",
+		},
+		cacheTTL: 5 * time.Minute,
+	}
+
+	// Create request context
+	reqCtx := RequestContext{
+		Messages: []core.Message{
+			core.NewHumanMessage("Test message"),
+		},
+		MessageCount: 1,
+		TotalTokens:  1500,
+		HasToolCalls: false,
+		Priority:     "medium",
+		Complexity:   "simple",
+	}
+
+	// Call SelectProvider - LLM fails, should fallback
+	provider, err := strategy.SelectProvider(ctx, reqCtx, providers)
+
+	// Error should be returned (indicating LLM failed)
+	if err == nil {
+		t.Error("Expected error when LLM fails, got nil")
+	}
+
+	// But a valid fallback provider should still be returned
+	if provider == "" {
+		t.Fatal("Expected fallback provider, got empty string")
+	}
+
+	if _, exists := providers[provider]; !exists {
+		t.Errorf("Fallback provider '%s' does not exist in available providers", provider)
+	}
+
+	// Verify LLM was called (not bypassed)
+	if mockLLM.GetInvocations() != 1 {
+		t.Errorf("Expected 1 LLM invocation, got %d", mockLLM.GetInvocations())
+	}
+
+	t.Logf("✓ LLM failure fell back gracefully to provider '%s'", provider)
+}
+
+// TestLLMRouting_InvalidProviderFromLLM tests that when the LLM returns
+// an invalid provider name, the strategy handles it correctly.
+// Validates: Requirement 11.3
+func TestLLMRouting_InvalidProviderFromLLM(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name        string
+		llmResponse string
+	}{
+		{
+			name:        "non-existent provider",
+			llmResponse: "nonexistent-provider",
+		},
+		{
+			name:        "empty response",
+			llmResponse: "",
+		},
+		{
+			name:        "malformed response",
+			llmResponse: "this is not a valid provider name",
+		},
+		{
+			name:        "provider with extra text",
+			llmResponse: "openai is the best choice for this request",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create mock LLM that returns invalid provider
+			mockLLM := &mockLLMForRouting{
+				response:   tc.llmResponse,
+				err:        nil,
+				shouldFail: false,
+			}
+
+			// Create available providers
+			providers := map[string]llms.ChatModel{
+				"openai":    &mockProviderForRouting{name: "openai"},
+				"anthropic": &mockProviderForRouting{name: "anthropic"},
+			}
+
+			// Create LLM routing strategy
+			strategy := &LLMRoutingStrategy{
+				model:     mockLLM,
+				providers: []string{"openai", "anthropic"},
+				providerDescriptions: map[string]string{
+					"openai":    "Fast and cost-effective",
+					"anthropic": "Highly capable",
+				},
+				cacheTTL: 5 * time.Minute,
+			}
+
+			// Create request context
+			reqCtx := RequestContext{
+				Messages: []core.Message{
+					core.NewHumanMessage("Test message"),
+				},
+				MessageCount: 1,
+				TotalTokens:  1000,
+				HasToolCalls: false,
+				Priority:     "medium",
+				Complexity:   "simple",
+			}
+
+			// Call SelectProvider - LLM returns invalid provider
+			provider, err := strategy.SelectProvider(ctx, reqCtx, providers)
+
+			// Error should be returned (indicating invalid provider)
+			if err == nil {
+				t.Error("Expected error when LLM returns invalid provider, got nil")
+			}
+
+			// But a valid fallback provider should still be returned
+			if provider == "" {
+				t.Fatal("Expected fallback provider, got empty string")
+			}
+
+			if _, exists := providers[provider]; !exists {
+				t.Errorf("Fallback provider '%s' does not exist in available providers", provider)
+			}
+
+			t.Logf("✓ Invalid LLM response '%s' handled, fell back to '%s'", tc.llmResponse, provider)
+		})
+	}
+}
+
+// TestLLMRouting_CacheExpiration tests that cache entries expire after TTL
+// and the LLM is called again for expired entries.
+// Validates: Requirements 11.7, 23.3
+func TestLLMRouting_CacheExpiration(t *testing.T) {
+	ctx := context.Background()
+
+	// Create mock LLM
+	mockLLM := &mockLLMForRouting{
+		response:   "anthropic",
+		err:        nil,
+		shouldFail: false,
+	}
+
+	// Create available providers
+	providers := map[string]llms.ChatModel{
+		"openai":    &mockProviderForRouting{name: "openai"},
+		"anthropic": &mockProviderForRouting{name: "anthropic"},
+	}
+
+	// Create LLM routing strategy with SHORT cache TTL
+	shortTTL := 100 * time.Millisecond
+	strategy := &LLMRoutingStrategy{
+		model:     mockLLM,
+		providers: []string{"openai", "anthropic"},
+		providerDescriptions: map[string]string{
+			"openai":    "Fast and cost-effective",
+			"anthropic": "Highly capable",
+		},
+		cacheTTL: shortTTL,
+	}
+
+	// Create request context
+	reqCtx := RequestContext{
+		Messages: []core.Message{
+			core.NewHumanMessage("Test message"),
+		},
+		MessageCount: 1,
+		TotalTokens:  1000,
+		HasToolCalls: false,
+		Priority:     "medium",
+		Complexity:   "simple",
+	}
+
+	// First call - should call LLM and cache result
+	provider1, err := strategy.SelectProvider(ctx, reqCtx, providers)
+	if err != nil {
+		t.Fatalf("First SelectProvider call failed: %v", err)
+	}
+
+	if provider1 != "anthropic" {
+		t.Errorf("Expected 'anthropic', got '%s'", provider1)
+	}
+
+	// Verify LLM was called once
+	if mockLLM.GetInvocations() != 1 {
+		t.Errorf("Expected 1 LLM invocation, got %d", mockLLM.GetInvocations())
+	}
+
+	// Second call immediately - should use cache
+	provider2, err := strategy.SelectProvider(ctx, reqCtx, providers)
+	if err != nil {
+		t.Fatalf("Second SelectProvider call failed: %v", err)
+	}
+
+	if provider2 != "anthropic" {
+		t.Errorf("Expected cached 'anthropic', got '%s'", provider2)
+	}
+
+	// Verify LLM was NOT called again (cache hit)
+	if mockLLM.GetInvocations() != 1 {
+		t.Errorf("Expected 1 LLM invocation (cache hit), got %d", mockLLM.GetInvocations())
+	}
+
+	// Wait for cache to expire
+	time.Sleep(shortTTL + 50*time.Millisecond)
+
+	// Third call after TTL - should call LLM again (cache expired)
+	provider3, err := strategy.SelectProvider(ctx, reqCtx, providers)
+	if err != nil {
+		t.Fatalf("Third SelectProvider call failed: %v", err)
+	}
+
+	if provider3 != "anthropic" {
+		t.Errorf("Expected 'anthropic' after cache expiration, got '%s'", provider3)
+	}
+
+	// Verify LLM was called again (cache expired)
+	if mockLLM.GetInvocations() != 2 {
+		t.Errorf("Expected 2 LLM invocations (cache expired), got %d", mockLLM.GetInvocations())
+	}
+
+	t.Logf("✓ Cache expired after %v, LLM called again", shortTTL)
+}
+
+// TestLLMRouting_NilLLMModel tests that when no LLM is configured,
+// the strategy falls back gracefully.
+// Validates: Requirement 11.4
+func TestLLMRouting_NilLLMModel(t *testing.T) {
+	ctx := context.Background()
+
+	// Create available providers
+	providers := map[string]llms.ChatModel{
+		"openai":    &mockProviderForRouting{name: "openai"},
+		"anthropic": &mockProviderForRouting{name: "anthropic"},
+	}
+
+	// Create LLM routing strategy with nil model
+	strategy := &LLMRoutingStrategy{
+		model:     nil, // No LLM configured
+		providers: []string{"openai", "anthropic"},
+		providerDescriptions: map[string]string{
+			"openai":    "Fast and cost-effective",
+			"anthropic": "Highly capable",
+		},
+		cacheTTL: 5 * time.Minute,
+	}
+
+	// Create request context
+	reqCtx := RequestContext{
+		Messages: []core.Message{
+			core.NewHumanMessage("Test message"),
+		},
+		MessageCount: 1,
+		TotalTokens:  1000,
+		HasToolCalls: false,
+		Priority:     "medium",
+		Complexity:   "simple",
+	}
+
+	// Call SelectProvider - should fallback without LLM
+	provider, err := strategy.SelectProvider(ctx, reqCtx, providers)
+
+	// Error should be returned (indicating LLM not configured)
+	if err == nil {
+		t.Error("Expected error when LLM is nil, got nil")
+	}
+
+	// But a valid fallback provider should still be returned
+	if provider == "" {
+		t.Fatal("Expected fallback provider, got empty string")
+	}
+
+	if _, exists := providers[provider]; !exists {
+		t.Errorf("Fallback provider '%s' does not exist in available providers", provider)
+	}
+
+	t.Logf("✓ Nil LLM handled gracefully, fell back to provider '%s'", provider)
+}
+
+// TestLLMRouting_EmptyProviders tests that when no providers are available,
+// an appropriate error is returned.
+// Validates: Error handling
+func TestLLMRouting_EmptyProviders(t *testing.T) {
+	ctx := context.Background()
+
+	// Create mock LLM
+	mockLLM := &mockLLMForRouting{
+		response:   "openai",
+		err:        nil,
+		shouldFail: false,
+	}
+
+	// Create LLM routing strategy
+	strategy := &LLMRoutingStrategy{
+		model:     mockLLM,
+		providers: []string{"openai", "anthropic"},
+		providerDescriptions: map[string]string{
+			"openai":    "Fast and cost-effective",
+			"anthropic": "Highly capable",
+		},
+		cacheTTL: 5 * time.Minute,
+	}
+
+	// Create request context
+	reqCtx := RequestContext{
+		Messages: []core.Message{
+			core.NewHumanMessage("Test message"),
+		},
+		MessageCount: 1,
+		TotalTokens:  1000,
+		HasToolCalls: false,
+		Priority:     "medium",
+		Complexity:   "simple",
+	}
+
+	// Call SelectProvider with empty providers map
+	emptyProviders := map[string]llms.ChatModel{}
+	provider, err := strategy.SelectProvider(ctx, reqCtx, emptyProviders)
+
+	// Should return error
+	if err == nil {
+		t.Error("Expected error when providers map is empty, got nil")
+	}
+
+	// Provider should be empty
+	if provider != "" {
+		t.Errorf("Expected empty provider, got '%s'", provider)
+	}
+
+	t.Log("✓ Empty providers map handled correctly with error")
+}
+
+// TestLLMRouting_CacheKeyGeneration tests that the cache key generation
+// is deterministic and produces different keys for different contexts.
+// Validates: Requirement 23.2
+func TestLLMRouting_CacheKeyGeneration(t *testing.T) {
+	strategy := &LLMRoutingStrategy{
+		cacheTTL: 5 * time.Minute,
+	}
+
+	t.Run("identical contexts produce identical keys", func(t *testing.T) {
+		reqCtx1 := RequestContext{
+			MessageCount: 5,
+			TotalTokens:  1500,
+			HasToolCalls: true,
+			Priority:     "high",
+			Complexity:   "complex",
+		}
+
+		reqCtx2 := RequestContext{
+			MessageCount: 5,
+			TotalTokens:  1500,
+			HasToolCalls: true,
+			Priority:     "high",
+			Complexity:   "complex",
+		}
+
+		key1 := strategy.generateCacheKey(reqCtx1)
+		key2 := strategy.generateCacheKey(reqCtx2)
+
+		if key1 != key2 {
+			t.Errorf("Expected identical keys for identical contexts, got '%s' vs '%s'", key1, key2)
+		}
+
+		if key1 == "" {
+			t.Error("Cache key should not be empty")
+		}
+
+		t.Logf("✓ Identical contexts produce identical key: %s", key1)
+	})
+
+	t.Run("different contexts produce different keys", func(t *testing.T) {
+		reqCtx1 := RequestContext{
+			MessageCount: 1,
+			TotalTokens:  500,
+			HasToolCalls: false,
+			Priority:     "low",
+			Complexity:   "simple",
+		}
+
+		reqCtx2 := RequestContext{
+			MessageCount: 10,
+			TotalTokens:  5000,
+			HasToolCalls: true,
+			Priority:     "high",
+			Complexity:   "complex",
+		}
+
+		key1 := strategy.generateCacheKey(reqCtx1)
+		key2 := strategy.generateCacheKey(reqCtx2)
+
+		if key1 == key2 {
+			t.Errorf("Expected different keys for different contexts, got same key: %s", key1)
+		}
+
+		t.Logf("✓ Different contexts produce different keys: %s vs %s", key1, key2)
+	})
+}
+
+// TestLLMRouting_ProviderNameParsing tests that the parseProviderName function
+// correctly extracts provider names from various LLM response formats.
+// Validates: Requirement 11.2
+func TestLLMRouting_ProviderNameParsing(t *testing.T) {
+	strategy := &LLMRoutingStrategy{}
+
+	testCases := []struct {
+		name     string
+		response string
+		expected string
+	}{
+		{
+			name:     "simple provider name",
+			response: "openai",
+			expected: "openai",
+		},
+		{
+			name:     "provider name with whitespace",
+			response: "  anthropic  ",
+			expected: "anthropic",
+		},
+		{
+			name:     "provider name with prefix",
+			response: "provider: openai",
+			expected: "openai",
+		},
+		{
+			name:     "provider name with period",
+			response: "anthropic.",
+			expected: "anthropic",
+		},
+		{
+			name:     "provider name in quotes",
+			response: "\"openai\"",
+			expected: "openai",
+		},
+		{
+			name:     "provider name in single quotes",
+			response: "'anthropic'",
+			expected: "anthropic",
+		},
+		{
+			name:     "provider name in backticks",
+			response: "`ollama`",
+			expected: "ollama",
+		},
+		{
+			name:     "uppercase provider name",
+			response: "OPENAI",
+			expected: "openai",
+		},
+		{
+			name:     "mixed case provider name",
+			response: "OpenAI",
+			expected: "openai",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := strategy.parseProviderName(tc.response)
+
+			if result != tc.expected {
+				t.Errorf("Expected '%s', got '%s'", tc.expected, result)
+			}
+
+			t.Logf("✓ Parsed '%s' → '%s'", tc.response, result)
+		})
+	}
+}
+
+// TestLLMRouting_OnSuccessOnError tests that the callback methods
+// are no-ops and don't cause errors.
+// Validates: Strategy interface implementation
+func TestLLMRouting_OnSuccessOnError(t *testing.T) {
+	ctx := context.Background()
+
+	strategy := &LLMRoutingStrategy{
+		providers: []string{"openai", "anthropic"},
+		cacheTTL:  5 * time.Minute,
+	}
+
+	// Test OnSuccess - should not panic or error
+	strategy.OnSuccess(ctx, "openai", 100*time.Millisecond)
+	t.Log("✓ OnSuccess executed without error")
+
+	// Test OnError - should not panic or error
+	strategy.OnError(ctx, "anthropic", errors.New("test error"))
+	t.Log("✓ OnError executed without error")
+}
+
+// TestLLMRouting_PromptBuilding tests that the routing prompt is built correctly
+// with request characteristics and provider descriptions.
+// Validates: Requirement 11.1
+func TestLLMRouting_PromptBuilding(t *testing.T) {
+	strategy := &LLMRoutingStrategy{
+		providers: []string{"openai", "anthropic", "ollama"},
+		providerDescriptions: map[string]string{
+			"openai":    "Fast and cost-effective",
+			"anthropic": "Highly capable for complex tasks",
+			"ollama":    "Local model for privacy",
+		},
+	}
+
+	providers := map[string]llms.ChatModel{
+		"openai":    &mockProviderForRouting{name: "openai"},
+		"anthropic": &mockProviderForRouting{name: "anthropic"},
+		"ollama":    &mockProviderForRouting{name: "ollama"},
+	}
+
+	reqCtx := RequestContext{
+		Messages: []core.Message{
+			core.NewHumanMessage("Test message"),
+		},
+		MessageCount: 5,
+		TotalTokens:  2500,
+		HasToolCalls: true,
+		Priority:     "high",
+		Complexity:   "complex",
+	}
+
+	prompt := strategy.buildRoutingPrompt(reqCtx, providers)
+
+	// Verify prompt contains request characteristics
+	if !strings.Contains(prompt, "Message Count: 5") {
+		t.Error("Prompt should contain message count")
+	}
+
+	if !strings.Contains(prompt, "Estimated Tokens: 2500") {
+		t.Error("Prompt should contain token count")
+	}
+
+	if !strings.Contains(prompt, "Has Tool Calls: true") {
+		t.Error("Prompt should contain tool calls flag")
+	}
+
+	if !strings.Contains(prompt, "Complexity: complex") {
+		t.Error("Prompt should contain complexity")
+	}
+
+	if !strings.Contains(prompt, "Priority: high") {
+		t.Error("Prompt should contain priority")
+	}
+
+	// Verify prompt contains provider descriptions
+	if !strings.Contains(prompt, "openai: Fast and cost-effective") {
+		t.Error("Prompt should contain openai description")
+	}
+
+	if !strings.Contains(prompt, "anthropic: Highly capable for complex tasks") {
+		t.Error("Prompt should contain anthropic description")
+	}
+
+	if !strings.Contains(prompt, "ollama: Local model for privacy") {
+		t.Error("Prompt should contain ollama description")
+	}
+
+	t.Log("✓ Routing prompt built correctly with all required information")
+}
