@@ -421,18 +421,18 @@ func TestProperty9_RouterCleanupCompleteness_WithCustomCleanup(t *testing.T) {
 	// Replace cleanup functions with tracked versions
 	// Note: This is a test-only approach to verify cleanup is called
 	originalCleanups := router.cleanups
-	router.cleanups = []CleanupFunc{
-		func() error {
+	router.cleanups = map[string]CleanupFunc{
+		"openai": func() error {
 			cleanup1Called.Add(1)
-			return originalCleanups[0]()
+			return originalCleanups["openai"]()
 		},
-		func() error {
+		"anthropic": func() error {
 			cleanup2Called.Add(1)
-			return originalCleanups[1]()
+			return originalCleanups["anthropic"]()
 		},
-		func() error {
+		"ollama": func() error {
 			cleanup3Called.Add(1)
-			return originalCleanups[2]()
+			return originalCleanups["ollama"]()
 		},
 	}
 

@@ -58,11 +58,11 @@ type ProviderEntry struct {
 // Implements llms.ChatModel interface for transparent usage
 type Router struct {
 	providers map[string]llms.ChatModel
-	cleanups  []CleanupFunc
+	cleanups  map[string]CleanupFunc // Map provider name to cleanup function
 	strategy  RoutingStrategy
 	fallback  FallbackStrategy
 	metrics   *RouterMetrics
-	mu        sync.RWMutex
+	mu        sync.RWMutex // Protects providers, cleanups, and router state
 }
 
 // RouterConfig holds router configuration
@@ -164,12 +164,18 @@ type CustomStrategy struct {
 // LLMRoutingStrategy uses an LLM to make routing decisions
 type LLMRoutingStrategy struct {
 	model                llms.ChatModel
-	providers            []string          // Available provider names
-	systemPrompt         string            // Custom system prompt for routing
-	providerDescriptions map[string]string // Description of each provider's strengths
-	cache                map[string]string // Cache routing decisions for similar requests
-	cacheTTL             time.Duration     // Cache entry time-to-live
-	mu                   sync.RWMutex      // Protects cache
+	providers            []string                  // Available provider names
+	systemPrompt         string                    // Custom system prompt for routing
+	providerDescriptions map[string]string         // Description of each provider's strengths
+	cache                map[string]*llmCacheEntry // Cache routing decisions for similar requests
+	cacheTTL             time.Duration             // Cache entry time-to-live
+	mu                   sync.RWMutex              // Protects cache
+}
+
+// llmCacheEntry stores a routing decision with its expiration time
+type llmCacheEntry struct {
+	providerName string
+	expiresAt    time.Time
 }
 
 // NoFallback never retries or falls back

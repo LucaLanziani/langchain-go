@@ -64,7 +64,7 @@ func NewRouter(ctx context.Context, entries []ProviderEntry, strategy RoutingStr
 	// Initialize router
 	router := &Router{
 		providers: make(map[string]llms.ChatModel),
-		cleanups:  make([]CleanupFunc, 0),
+		cleanups:  make(map[string]CleanupFunc),
 		strategy:  strategy,
 		fallback:  config.FallbackStrategy,
 		metrics:   newRouterMetrics(),
@@ -74,12 +74,13 @@ func NewRouter(ctx context.Context, entries []ProviderEntry, strategy RoutingStr
 	createdProviders := make([]string, 0)
 
 	// Create all providers
+	// Note: No mutex needed during initialization as router is not yet shared
 	for _, entry := range entries {
 		model, cleanup, err := NewProvider(ctx, entry.ProviderType, entry.Options...)
 		if err != nil {
 			// Cleanup all successfully created providers
 			for _, name := range createdProviders {
-				if cleanupFn := router.getCleanup(name); cleanupFn != nil {
+				if cleanupFn := router.cleanups[name]; cleanupFn != nil {
 					_ = cleanupFn()
 				}
 			}
@@ -87,13 +88,15 @@ func NewRouter(ctx context.Context, entries []ProviderEntry, strategy RoutingStr
 		}
 
 		router.providers[entry.Name] = model
-		router.cleanups = append(router.cleanups, cleanup)
+		router.cleanups[entry.Name] = cleanup
 		createdProviders = append(createdProviders, entry.Name)
 
 		// Initialize metrics for this provider
+		router.metrics.mu.Lock()
 		router.metrics.RequestCount[entry.Name] = 0
 		router.metrics.ErrorCount[entry.Name] = 0
 		router.metrics.TotalLatency[entry.Name] = 0
+		router.metrics.mu.Unlock()
 	}
 
 	return router, nil
@@ -101,21 +104,10 @@ func NewRouter(ctx context.Context, entries []ProviderEntry, strategy RoutingStr
 
 // getCleanup returns the cleanup function for a provider by name.
 // This is used during partial initialization failure cleanup.
+// Note: This method is only called during initialization before the router
+// is shared, so it doesn't need mutex protection.
 func (r *Router) getCleanup(name string) CleanupFunc {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	// Find the index of the provider
-	idx := 0
-	for providerName := range r.providers {
-		if providerName == name {
-			if idx < len(r.cleanups) {
-				return r.cleanups[idx]
-			}
-		}
-		idx++
-	}
-	return nil
+	return r.cleanups[name]
 }
 
 // Cleanup releases all resources held by the router and its providers.
@@ -138,15 +130,15 @@ func (r *Router) Cleanup() error {
 	var firstErr error
 
 	// Call cleanup for all providers
-	for _, cleanup := range r.cleanups {
+	for name, cleanup := range r.cleanups {
 		if cleanup != nil {
 			if err := cleanup(); err != nil && firstErr == nil {
-				firstErr = err
+				firstErr = fmt.Errorf("cleanup failed for provider %s: %w", name, err)
 			}
 		}
 	}
 
-	// Clear providers map to mark as cleaned up
+	// Clear providers and cleanups maps to mark as cleaned up
 	r.providers = nil
 	r.cleanups = nil
 
