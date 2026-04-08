@@ -56,6 +56,28 @@ func TestGetName(t *testing.T) {
 	}
 }
 
+func TestBuildClientOptions(t *testing.T) {
+	opts := DefaultOptions()
+	opts.GithubToken = "test-token"
+	opts.CLIPath = "/usr/local/bin/copilot"
+	opts.LogLevel = "debug"
+
+	clientOpts := buildClientOptions(opts)
+
+	if clientOpts.LogLevel != "debug" {
+		t.Fatalf("expected log level 'debug', got %q", clientOpts.LogLevel)
+	}
+	if clientOpts.GitHubToken != "test-token" {
+		t.Fatalf("expected GitHub token to be forwarded, got %q", clientOpts.GitHubToken)
+	}
+	if clientOpts.CLIPath != "/usr/local/bin/copilot" {
+		t.Fatalf("expected CLI path to be forwarded, got %q", clientOpts.CLIPath)
+	}
+	if len(clientOpts.CLIArgs) != 1 || clientOpts.CLIArgs[0] != "--disable-builtin-mcps" {
+		t.Fatalf("expected built-in MCP restriction CLI args, got %v", clientOpts.CLIArgs)
+	}
+}
+
 func TestBindTools(t *testing.T) {
 	model := &ChatModel{opts: DefaultOptions()}
 
@@ -270,6 +292,18 @@ func TestBuildSessionConfig(t *testing.T) {
 		if sessionCfg.InfiniteSessions == nil || *sessionCfg.InfiniteSessions.Enabled {
 			t.Error("expected infinite sessions to be disabled")
 		}
+		if sessionCfg.AvailableTools == nil {
+			t.Fatal("expected available tools allowlist to be set")
+		}
+		if len(sessionCfg.AvailableTools) != 0 {
+			t.Errorf("expected no available tools, got %v", sessionCfg.AvailableTools)
+		}
+		if !stringSliceContains(sessionCfg.ExcludedTools, "web_fetch") {
+			t.Fatalf("expected web_fetch to be excluded by default, got %v", sessionCfg.ExcludedTools)
+		}
+		if !stringSliceContains(sessionCfg.ExcludedTools, "task") {
+			t.Fatalf("expected task to be excluded by default, got %v", sessionCfg.ExcludedTools)
+		}
 	})
 
 	t.Run("with system message", func(t *testing.T) {
@@ -339,6 +373,75 @@ func TestBuildSessionConfig(t *testing.T) {
 		}
 		if sessionCfg.Tools[0].Name != "calculator" {
 			t.Errorf("expected tool name 'calculator', got %q", sessionCfg.Tools[0].Name)
+		}
+		if len(sessionCfg.AvailableTools) != 1 || sessionCfg.AvailableTools[0] != "calculator" {
+			t.Errorf("expected available tools [calculator], got %v", sessionCfg.AvailableTools)
+		}
+	})
+
+	t.Run("with explicit bridged tools", func(t *testing.T) {
+		model := &ChatModel{
+			opts: &Options{
+				Model: "gpt-5-mini",
+				Tools: []tools.Tool{
+					&mockTool{
+						name:        "weather",
+						description: "Gets weather",
+						schema:      map[string]any{"type": "object"},
+						runFunc: func(ctx context.Context, input string) (string, error) {
+							return "sunny", nil
+						},
+					},
+				},
+			},
+		}
+
+		messages := []core.Message{core.NewHumanMessage("hello")}
+		cfg := core.DefaultConfig()
+
+		sessionCfg := model.buildSessionConfig(ctx, messages, cfg)
+
+		if len(sessionCfg.Tools) != 1 {
+			t.Fatalf("expected 1 tool, got %d", len(sessionCfg.Tools))
+		}
+		if sessionCfg.Tools[0].Name != "weather" {
+			t.Errorf("expected tool name 'weather', got %q", sessionCfg.Tools[0].Name)
+		}
+		if sessionCfg.Tools[0].Handler == nil {
+			t.Fatal("expected bridged tool handler to be set")
+		}
+		if len(sessionCfg.AvailableTools) != 1 || sessionCfg.AvailableTools[0] != "weather" {
+			t.Errorf("expected available tools [weather], got %v", sessionCfg.AvailableTools)
+		}
+	})
+
+	t.Run("deduplicates available tools", func(t *testing.T) {
+		model := &ChatModel{
+			opts: &Options{
+				Model: "gpt-5-mini",
+				Tools: []tools.Tool{
+					&mockTool{
+						name:        "calculator",
+						description: "Does math",
+						schema:      map[string]any{"type": "object"},
+						runFunc: func(ctx context.Context, input string) (string, error) {
+							return "42", nil
+						},
+					},
+				},
+			},
+			boundTools: []llms.ToolDefinition{
+				{Name: "calculator", Description: "Does math", Parameters: map[string]any{"type": "object"}},
+			},
+		}
+
+		messages := []core.Message{core.NewHumanMessage("hello")}
+		cfg := core.DefaultConfig()
+
+		sessionCfg := model.buildSessionConfig(ctx, messages, cfg)
+
+		if len(sessionCfg.AvailableTools) != 1 || sessionCfg.AvailableTools[0] != "calculator" {
+			t.Errorf("expected deduplicated available tools [calculator], got %v", sessionCfg.AvailableTools)
 		}
 	})
 
@@ -647,6 +750,15 @@ func contains(s, substr string) bool {
 func containsHelper(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func stringSliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
 			return true
 		}
 	}
