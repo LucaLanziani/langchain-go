@@ -2,6 +2,7 @@ package outputparsers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/LucaLanziani/langchain-go/core"
@@ -156,5 +157,25 @@ func TestJSONOutputParserBatchError(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("expected error for invalid JSON in batch")
+	}
+}
+
+func TestJSONOutputParserTruncatesRawErrorText(t *testing.T) {
+	parser := NewJSONOutputParser[testStruct]()
+	msg := core.NewAIMessage(strings.Repeat("x", 250))
+
+	_, err := parser.Parse(msg)
+	if err == nil {
+		t.Fatal("expected parse error")
+	}
+	errText := err.Error()
+	if !strings.Contains(errText, "Raw text: ") {
+		t.Fatalf("expected raw text in error, got %q", errText)
+	}
+	if !strings.Contains(errText, "...") {
+		t.Fatalf("expected truncated raw text marker, got %q", errText)
+	}
+	if strings.Contains(errText, strings.Repeat("x", 220)) {
+		t.Fatalf("expected raw text to be truncated, got %q", errText)
 	}
 }

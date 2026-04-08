@@ -148,10 +148,11 @@ func (r *Router) Cleanup() error {
 // newRouterMetrics creates a new RouterMetrics instance with initialized maps
 func newRouterMetrics() *RouterMetrics {
 	return &RouterMetrics{
-		RequestCount: make(map[string]int64),
-		ErrorCount:   make(map[string]int64),
-		TotalLatency: make(map[string]time.Duration),
-		LastUsed:     make(map[string]time.Time),
+		RequestCount:   make(map[string]int64),
+		ErrorCount:     make(map[string]int64),
+		CancelledCount: make(map[string]int64),
+		TotalLatency:   make(map[string]time.Duration),
+		LastUsed:       make(map[string]time.Time),
 	}
 }
 
@@ -164,6 +165,23 @@ func (r *Router) updateMetrics(providerName string, latency time.Duration, isErr
 	r.metrics.TotalLatency[providerName] += latency
 	r.metrics.LastUsed[providerName] = time.Now()
 
+	if isError {
+		r.metrics.ErrorCount[providerName]++
+	}
+}
+
+func (r *Router) updateStreamMetrics(providerName string, latency time.Duration, isError bool, isCancelled bool) {
+	r.metrics.mu.Lock()
+	defer r.metrics.mu.Unlock()
+
+	r.metrics.RequestCount[providerName]++
+	r.metrics.TotalLatency[providerName] += latency
+	r.metrics.LastUsed[providerName] = time.Now()
+
+	if isCancelled {
+		r.metrics.CancelledCount[providerName]++
+		return
+	}
 	if isError {
 		r.metrics.ErrorCount[providerName]++
 	}
@@ -208,10 +226,11 @@ func (r *Router) GetMetrics() map[string]ProviderMetrics {
 	result := make(map[string]ProviderMetrics)
 	for name := range r.metrics.RequestCount {
 		result[name] = ProviderMetrics{
-			RequestCount: r.metrics.RequestCount[name],
-			ErrorCount:   r.metrics.ErrorCount[name],
-			TotalLatency: r.metrics.TotalLatency[name],
-			LastUsed:     r.metrics.LastUsed[name],
+			RequestCount:   r.metrics.RequestCount[name],
+			ErrorCount:     r.metrics.ErrorCount[name],
+			CancelledCount: r.metrics.CancelledCount[name],
+			TotalLatency:   r.metrics.TotalLatency[name],
+			LastUsed:       r.metrics.LastUsed[name],
 		}
 	}
 	return result
@@ -219,10 +238,11 @@ func (r *Router) GetMetrics() map[string]ProviderMetrics {
 
 // ProviderMetrics holds metrics for a single provider
 type ProviderMetrics struct {
-	RequestCount int64
-	ErrorCount   int64
-	TotalLatency time.Duration
-	LastUsed     time.Time
+	RequestCount   int64
+	ErrorCount     int64
+	CancelledCount int64
+	TotalLatency   time.Duration
+	LastUsed       time.Time
 }
 
 // Invoke implements the core.Runnable interface.
@@ -410,18 +430,74 @@ func (r *Router) Stream(ctx context.Context, messages []core.Message, opts ...co
 	// Stream from selected provider
 	startTime := time.Now()
 	iter, err := provider.Stream(ctx, messages, opts...)
-	latency := time.Since(startTime)
 
 	if err != nil {
-		r.updateMetrics(providerName, latency, true)
+		r.updateStreamMetrics(providerName, time.Since(startTime), true, false)
 		r.strategy.OnError(ctx, providerName, err)
 		return nil, err
 	}
 
-	r.updateMetrics(providerName, latency, false)
-	r.strategy.OnSuccess(ctx, providerName, latency)
+	outCh := make(chan core.StreamChunk[*core.AIMessage], 64)
+	wrapped := core.NewStreamIterator(outCh)
 
-	return iter, nil
+	go func() {
+		defer close(outCh)
+
+		listenerDone := make(chan struct{})
+		defer close(listenerDone)
+		go func() {
+			select {
+			case <-wrapped.Done():
+				iter.Close()
+			case <-listenerDone:
+			}
+		}()
+
+		cancelled := false
+		var streamErr error
+		defer func() {
+			latency := time.Since(startTime)
+			r.updateStreamMetrics(providerName, latency, streamErr != nil, cancelled)
+			if streamErr != nil {
+				r.strategy.OnError(ctx, providerName, streamErr)
+				return
+			}
+			if !cancelled {
+				r.strategy.OnSuccess(ctx, providerName, latency)
+			}
+		}()
+
+		for {
+			chunk, ok, err := iter.Next()
+			if err != nil {
+				streamErr = err
+				outCh <- core.StreamChunk[*core.AIMessage]{Err: err}
+				return
+			}
+			if !ok {
+				select {
+				case <-wrapped.Done():
+					cancelled = true
+				default:
+				}
+				return
+			}
+
+			select {
+			case outCh <- core.StreamChunk[*core.AIMessage]{Value: chunk}:
+			case <-wrapped.Done():
+				cancelled = true
+				iter.Close()
+				return
+			case <-ctx.Done():
+				cancelled = true
+				iter.Close()
+				return
+			}
+		}
+	}()
+
+	return wrapped, nil
 }
 
 // Batch implements the core.Runnable interface.
@@ -437,11 +513,29 @@ func (r *Router) Batch(ctx context.Context, inputs [][]core.Message, opts ...cor
 	results := make([]*core.AIMessage, len(inputs))
 	errs := make([]error, len(inputs))
 
+	cfg := core.ApplyOptions(opts...)
+	limit := len(inputs)
+	if cfg.MaxConcurrency > 0 && cfg.MaxConcurrency < limit {
+		limit = cfg.MaxConcurrency
+	}
+	if limit <= 0 {
+		limit = 1
+	}
+	sem := make(chan struct{}, limit)
+
 	var wg sync.WaitGroup
 	for i, input := range inputs {
 		wg.Add(1)
 		go func(idx int, msg []core.Message) {
 			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				errs[idx] = ctx.Err()
+				return
+			}
+			defer func() { <-sem }()
+
 			result, err := r.Invoke(ctx, msg, opts...)
 			results[idx] = result
 			errs[idx] = err
@@ -449,11 +543,14 @@ func (r *Router) Batch(ctx context.Context, inputs [][]core.Message, opts ...cor
 	}
 	wg.Wait()
 
-	// Return first error if any
-	for _, err := range errs {
+	failedItems := make(map[int]error)
+	for idx, err := range errs {
 		if err != nil {
-			return results, err
+			failedItems[idx] = err
 		}
+	}
+	if len(failedItems) > 0 {
+		return results, &BatchError{FailedItems: failedItems}
 	}
 
 	return results, nil

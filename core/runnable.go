@@ -21,7 +21,8 @@ type Runnable[I, O any] interface {
 	Stream(ctx context.Context, input I, opts ...Option) (*StreamIterator[O], error)
 
 	// Batch transforms multiple inputs in parallel.
-	// Returns a slice of outputs corresponding to each input.
+	// Implementations honor WithMaxConcurrency when they delegate to the shared
+	// batch helper used throughout this library.
 	Batch(ctx context.Context, inputs []I, opts ...Option) ([]O, error)
 
 	// GetName returns the name of this runnable for tracing and debugging.
@@ -63,16 +64,21 @@ func (s *StreamIterator[T]) Next() (T, bool, error) {
 	}
 	s.mu.Unlock()
 
-	chunk, ok := <-s.ch
-	if !ok {
+	select {
+	case <-s.done:
 		var zero T
 		return zero, false, nil
+	case chunk, ok := <-s.ch:
+		if !ok {
+			var zero T
+			return zero, false, nil
+		}
+		if chunk.Err != nil {
+			var zero T
+			return zero, false, chunk.Err
+		}
+		return chunk.Value, true, nil
 	}
-	if chunk.Err != nil {
-		var zero T
-		return zero, false, chunk.Err
-	}
-	return chunk.Value, true, nil
 }
 
 // Collect reads all remaining chunks and returns them as a slice.
@@ -104,4 +110,9 @@ func (s *StreamIterator[T]) Close() {
 			}
 		}()
 	}
+}
+
+// Done returns a channel that is closed when the iterator is closed.
+func (s *StreamIterator[T]) Done() <-chan struct{} {
+	return s.done
 }

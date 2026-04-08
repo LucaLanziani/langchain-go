@@ -57,13 +57,7 @@ func (p *StringOutputParser) Stream(ctx context.Context, input *core.AIMessage, 
 
 // Batch parses multiple messages.
 func (p *StringOutputParser) Batch(ctx context.Context, inputs []*core.AIMessage, opts ...core.Option) ([]string, error) {
-	results := make([]string, len(inputs))
-	for i, input := range inputs {
-		result, err := p.Parse(input)
-		if err != nil {
-			return nil, err
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, func(ctx context.Context, input *core.AIMessage, _ ...core.Option) (string, error) {
+		return p.Parse(input)
+	})
 }

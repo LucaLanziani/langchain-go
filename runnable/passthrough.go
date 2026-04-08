@@ -2,7 +2,7 @@ package runnable
 
 import (
 	"context"
-	"fmt"
+	"sort"
 
 	"github.com/LucaLanziani/langchain-go/core"
 )
@@ -77,6 +77,7 @@ func NewAssign[I any](additions map[string]func(ctx context.Context, input I, op
 	for k := range additions {
 		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 	return &Assign[I]{additions: additions, keys: keys}
 }
 
@@ -122,13 +123,5 @@ func (a *Assign[I]) Stream(ctx context.Context, input I, opts ...core.Option) (*
 
 // Batch runs for multiple inputs.
 func (a *Assign[I]) Batch(ctx context.Context, inputs []I, opts ...core.Option) ([]map[string]any, error) {
-	results := make([]map[string]any, len(inputs))
-	for i, input := range inputs {
-		result, err := a.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, a.Invoke)
 }

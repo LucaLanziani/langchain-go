@@ -3,6 +3,7 @@ package runnable
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/LucaLanziani/langchain-go/core"
@@ -13,7 +14,7 @@ import (
 // It implements Runnable[I, map[string]any].
 type Parallel[I any] struct {
 	branches map[string]func(ctx context.Context, input I, opts ...core.Option) (any, error)
-	keys     []string // preserve insertion order
+	keys     []string // deterministic branch order
 	name     string
 }
 
@@ -29,6 +30,7 @@ func NewParallel[I, O any](branches map[string]core.Runnable[I, O]) *Parallel[I]
 			return r.Invoke(ctx, input, opts...)
 		}
 	}
+	sort.Strings(p.keys)
 	return p
 }
 
@@ -40,6 +42,7 @@ func NewParallelAny[I any](branches map[string]func(ctx context.Context, input I
 	for k := range branches {
 		p.keys = append(p.keys, k)
 	}
+	sort.Strings(p.keys)
 	return p
 }
 
@@ -116,13 +119,5 @@ func (p *Parallel[I]) Stream(ctx context.Context, input I, opts ...core.Option) 
 
 // Batch runs the parallel execution for multiple inputs.
 func (p *Parallel[I]) Batch(ctx context.Context, inputs []I, opts ...core.Option) ([]map[string]any, error) {
-	results := make([]map[string]any, len(inputs))
-	for i, input := range inputs {
-		result, err := p.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, p.Invoke)
 }

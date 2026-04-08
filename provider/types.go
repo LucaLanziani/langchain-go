@@ -118,11 +118,12 @@ type RoutingRule struct {
 
 // RouterMetrics tracks routing statistics
 type RouterMetrics struct {
-	RequestCount map[string]int64         // Requests per provider
-	ErrorCount   map[string]int64         // Errors per provider
-	TotalLatency map[string]time.Duration // Total latency per provider
-	LastUsed     map[string]time.Time     // Last usage timestamp
-	mu           sync.RWMutex
+	RequestCount   map[string]int64         // Requests per provider
+	ErrorCount     map[string]int64         // Errors per provider
+	CancelledCount map[string]int64         // Cancelled streams per provider
+	TotalLatency   map[string]time.Duration // Total latency per provider
+	LastUsed       map[string]time.Time     // Last usage timestamp
+	mu             sync.RWMutex
 }
 
 // SimpleStrategy always routes to a specific provider
@@ -140,6 +141,7 @@ type RoundRobinStrategy struct {
 type WeightedStrategy struct {
 	weights map[string]int
 	mu      sync.RWMutex
+	rngMu   sync.Mutex
 	rng     *rand.Rand
 }
 
@@ -168,14 +170,21 @@ type LLMRoutingStrategy struct {
 	systemPrompt         string                    // Custom system prompt for routing
 	providerDescriptions map[string]string         // Description of each provider's strengths
 	cache                map[string]*llmCacheEntry // Cache routing decisions for similar requests
-	cacheTTL             time.Duration             // Cache entry time-to-live
-	mu                   sync.RWMutex              // Protects cache
+	inFlight             map[string]*llmPendingCall
+	cacheTTL             time.Duration // Cache entry time-to-live
+	mu                   sync.RWMutex  // Protects cache
 }
 
 // llmCacheEntry stores a routing decision with its expiration time
 type llmCacheEntry struct {
 	providerName string
 	expiresAt    time.Time
+}
+
+type llmPendingCall struct {
+	done         chan struct{}
+	providerName string
+	err          error
 }
 
 // NoFallback never retries or falls back

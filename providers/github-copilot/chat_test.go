@@ -20,10 +20,12 @@ type mockTool struct {
 	runFunc     func(ctx context.Context, input string) (string, error)
 }
 
-func (m *mockTool) Name() string                                                { return m.name }
-func (m *mockTool) Description() string                                         { return m.description }
-func (m *mockTool) ArgsSchema() map[string]any                                  { return m.schema }
-func (m *mockTool) Run(ctx context.Context, input string) (string, error)       { return m.runFunc(ctx, input) }
+func (m *mockTool) Name() string               { return m.name }
+func (m *mockTool) Description() string        { return m.description }
+func (m *mockTool) ArgsSchema() map[string]any { return m.schema }
+func (m *mockTool) Run(ctx context.Context, input string) (string, error) {
+	return m.runFunc(ctx, input)
+}
 
 func TestNew(t *testing.T) {
 	// This test requires a real Copilot CLI setup, so we skip it in CI.
@@ -77,6 +79,21 @@ func TestBindTools(t *testing.T) {
 	}
 }
 
+func TestBindToolsDoesNotAliasDerivedModels(t *testing.T) {
+	model := &ChatModel{opts: DefaultOptions(), boundTools: make([]llms.ToolDefinition, 1, 4)}
+	model.boundTools[0] = llms.ToolDefinition{Name: "base"}
+
+	left := model.BindTools(llms.ToolDefinition{Name: "left"}).(*ChatModel)
+	right := model.BindTools(llms.ToolDefinition{Name: "right"}).(*ChatModel)
+
+	if left.boundTools[1].Name != "left" {
+		t.Fatalf("expected isolated left tool, got %q", left.boundTools[1].Name)
+	}
+	if right.boundTools[1].Name != "right" {
+		t.Fatalf("expected isolated right tool, got %q", right.boundTools[1].Name)
+	}
+}
+
 func TestWithStructuredOutput(t *testing.T) {
 	model := &ChatModel{opts: DefaultOptions()}
 
@@ -101,6 +118,24 @@ func TestWithStructuredOutput(t *testing.T) {
 	}
 	if structuredModel.structuredSchema["type"] != "object" {
 		t.Errorf("expected schema type 'object', got %v", structuredModel.structuredSchema["type"])
+	}
+}
+
+func TestWithStructuredOutputClonesSchema(t *testing.T) {
+	model := &ChatModel{opts: DefaultOptions()}
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"name": map[string]any{"type": "string"},
+		},
+	}
+
+	structuredModel := model.WithStructuredOutput(schema).(*ChatModel)
+	schema["properties"].(map[string]any)["name"].(map[string]any)["type"] = "integer"
+
+	got := structuredModel.structuredSchema["properties"].(map[string]any)["name"].(map[string]any)["type"]
+	if got != "string" {
+		t.Fatalf("expected cloned schema to remain unchanged, got %v", got)
 	}
 }
 

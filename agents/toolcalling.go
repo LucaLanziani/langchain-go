@@ -64,6 +64,7 @@ func (a *ToolCallingAgent) Plan(ctx context.Context, intermediateSteps []AgentSt
 			actions[i] = AgentAction{
 				Tool:       tc.Name,
 				ToolInput:  string(tc.Args),
+				ToolCallID: tc.ID,
 				Log:        fmt.Sprintf("Calling tool: %s", tc.Name),
 				MessageLog: []core.Message{response},
 			}
@@ -103,7 +104,7 @@ func (a *ToolCallingAgent) OutputKeys() []string {
 // formatToolCallingSteps converts intermediate steps to messages for the scratchpad.
 func formatToolCallingSteps(steps []AgentStep) []core.Message {
 	var messages []core.Message
-	for _, step := range steps {
+	for i, step := range steps {
 		// Add the AI message that triggered this tool call.
 		argsJSON := step.Action.ToolInput
 		// Ensure valid JSON for args.
@@ -111,10 +112,15 @@ func formatToolCallingSteps(steps []AgentStep) []core.Message {
 			argsJSON = fmt.Sprintf(`{"input": %q}`, argsJSON)
 		}
 
+		toolCallID := step.Action.ToolCallID
+		if toolCallID == "" {
+			toolCallID = fmt.Sprintf("call_%s_%d", step.Action.Tool, i)
+		}
+
 		// Create an AI message with the tool call.
 		aiMsg := core.NewAIMessageWithToolCalls("", []core.ToolCall{
 			{
-				ID:   fmt.Sprintf("call_%s", step.Action.Tool),
+				ID:   toolCallID,
 				Name: step.Action.Tool,
 				Args: json.RawMessage(argsJSON),
 				Type: "function",
@@ -125,7 +131,7 @@ func formatToolCallingSteps(steps []AgentStep) []core.Message {
 		// Add the tool result message.
 		messages = append(messages, core.NewToolMessage(
 			step.Observation,
-			fmt.Sprintf("call_%s", step.Action.Tool),
+			toolCallID,
 		))
 	}
 	return messages

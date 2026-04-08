@@ -147,3 +147,14 @@ func TestParallelMaxConcurrency(t *testing.T) {
 		t.Errorf("expected double=10, got %v", result["double"])
 	}
 }
+
+func TestParallelSortsKeysDeterministically(t *testing.T) {
+	p := NewParallel[int, int](map[string]core.Runnable[int, int]{
+		"zeta":  &mockRunnable[int, int]{fn: func(_ context.Context, i int) (int, error) { return i, nil }, name: "zeta"},
+		"alpha": &mockRunnable[int, int]{fn: func(_ context.Context, i int) (int, error) { return i, nil }, name: "alpha"},
+	})
+
+	if len(p.keys) != 2 || p.keys[0] != "alpha" || p.keys[1] != "zeta" {
+		t.Fatalf("expected deterministic sorted keys, got %v", p.keys)
+	}
+}

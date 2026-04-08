@@ -2,7 +2,6 @@ package runnable
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/LucaLanziani/langchain-go/core"
 )
@@ -66,13 +65,7 @@ func (l *Lambda[I, O]) Stream(ctx context.Context, input I, opts ...core.Option)
 
 // Batch runs the function for each input.
 func (l *Lambda[I, O]) Batch(ctx context.Context, inputs []I, opts ...core.Option) ([]O, error) {
-	results := make([]O, len(inputs))
-	for i, input := range inputs {
-		result, err := l.fn(ctx, input)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, func(ctx context.Context, input I, _ ...core.Option) (O, error) {
+		return l.fn(ctx, input)
+	})
 }

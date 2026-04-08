@@ -3,20 +3,12 @@ package agents
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/LucaLanziani/langchain-go/core"
 	"github.com/LucaLanziani/langchain-go/llms"
 	"github.com/LucaLanziani/langchain-go/prompts"
 	"github.com/LucaLanziani/langchain-go/tools"
-)
-
-// ReAct agent output parsing regex.
-var (
-	actionRegex      = regexp.MustCompile(`Action\s*:\s*(.+?)(?:\n|$)`)
-	actionInputRegex = regexp.MustCompile(`Action\s*Input\s*:\s*(.+?)(?:\n|$)`)
-	finalAnswerRegex = regexp.MustCompile(`Final\s*Answer\s*:\s*(.+)`)
 )
 
 // DefaultReActPrompt returns the default ReAct prompt template.
@@ -143,28 +135,20 @@ func formatReActScratchpad(steps []AgentStep) []core.Message {
 
 // parseReActOutput parses the LLM text output into an AgentOutput.
 func parseReActOutput(text string) (*AgentOutput, error) {
-	// Check for Final Answer.
-	if matches := finalAnswerRegex.FindStringSubmatch(text); len(matches) > 1 {
+	if finalAnswer := extractReActSection(text, "Final Answer:", nil); finalAnswer != "" {
 		return &AgentOutput{
 			Finish: &AgentFinish{
 				ReturnValues: map[string]any{
-					"output": strings.TrimSpace(matches[1]),
+					"output": finalAnswer,
 				},
 				Log: text,
 			},
 		}, nil
 	}
 
-	// Check for Action + Action Input.
-	actionMatches := actionRegex.FindStringSubmatch(text)
-	inputMatches := actionInputRegex.FindStringSubmatch(text)
-
-	if len(actionMatches) > 1 {
-		tool := strings.TrimSpace(actionMatches[1])
-		toolInput := ""
-		if len(inputMatches) > 1 {
-			toolInput = strings.TrimSpace(inputMatches[1])
-		}
+	tool := extractReActSection(text, "Action:", []string{"Action Input:", "Observation:", "Thought:", "Final Answer:"})
+	if tool != "" {
+		toolInput := extractReActSection(text, "Action Input:", []string{"Observation:", "Thought:", "Final Answer:", "Action:"})
 		return &AgentOutput{
 			Actions: []AgentAction{
 				{
@@ -177,6 +161,49 @@ func parseReActOutput(text string) (*AgentOutput, error) {
 	}
 
 	return nil, fmt.Errorf("could not parse LLM output: %q", text)
+}
+
+func extractReActSection(text string, prefix string, stopPrefixes []string) string {
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	collecting := false
+	collected := make([]string, 0, len(lines))
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !collecting {
+			if strings.HasPrefix(trimmed, prefix) {
+				collecting = true
+				collected = append(collected, strings.TrimSpace(strings.TrimPrefix(trimmed, prefix)))
+			}
+			continue
+		}
+
+		if hasReActPrefix(trimmed, stopPrefixes) {
+			break
+		}
+		collected = append(collected, line)
+	}
+
+	value := strings.TrimSpace(strings.Join(collected, "\n"))
+	if value == "" {
+		return ""
+	}
+
+	valueLines := strings.Split(value, "\n")
+	if len(valueLines) >= 2 && strings.HasPrefix(strings.TrimSpace(valueLines[0]), "```") && strings.TrimSpace(valueLines[len(valueLines)-1]) == "```" {
+		value = strings.TrimSpace(strings.Join(valueLines[1:len(valueLines)-1], "\n"))
+	}
+
+	return value
+}
+
+func hasReActPrefix(line string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // Ensure ReActAgent implements Agent.

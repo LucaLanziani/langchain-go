@@ -80,16 +80,42 @@ func TestLangSmithHandlerWithMockServer(t *testing.T) {
 
 	ctx := context.Background()
 	h.OnChainStart(ctx, map[string]any{}, "run-1", "", map[string]any{"name": "TestChain"})
-
-	// Give goroutines time to complete.
-	// Use a channel-based approach: wait for at least one POST.
 	h.OnChainEnd(ctx, map[string]any{}, "run-1")
+	if err := h.Flush(ctx); err != nil {
+		t.Fatalf("Flush error: %v", err)
+	}
+	if len(received) != 2 {
+		t.Fatalf("expected 2 requests after flush, got %d (%v)", len(received), received)
+	}
+}
 
-	// Wait a bit for the async goroutines.
-	for i := 0; i < 100; i++ {
-		if len(received) >= 2 {
-			break
-		}
-		// spin briefly
+func TestLangSmithHandlerCloseStopsNewEvents(t *testing.T) {
+	received := make([]string, 0)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received = append(received, r.Method+" "+r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	h := &LangSmithHandler{
+		apiKey:   "test-key",
+		endpoint: server.URL,
+		project:  "test",
+		client:   server.Client(),
+		runs:     make(map[string]*langSmithRun),
+	}
+
+	ctx := context.Background()
+	h.OnChainStart(ctx, map[string]any{}, "run-1", "", map[string]any{"name": "TestChain"})
+	h.OnChainEnd(ctx, map[string]any{}, "run-1")
+	if err := h.Close(ctx); err != nil {
+		t.Fatalf("Close error: %v", err)
+	}
+
+	before := len(received)
+	h.OnChainStart(ctx, map[string]any{}, "run-2", "", map[string]any{"name": "Ignored"})
+	h.OnChainEnd(ctx, map[string]any{}, "run-2")
+	if len(received) != before {
+		t.Fatalf("expected closed handler to stop new events, got %v", received)
 	}
 }

@@ -61,9 +61,17 @@ func (p *JSONOutputParser[T]) ParseString(text string) (T, error) {
 	}
 
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return result, fmt.Errorf("failed to parse JSON output: %w\nRaw text: %s", err, text)
+		return result, fmt.Errorf("failed to parse JSON output: %w\nRaw text: %s", err, truncateForError(text, 200))
 	}
 	return result, nil
+}
+
+func truncateForError(text string, limit int) string {
+	text = strings.TrimSpace(text)
+	if limit <= 0 || len(text) <= limit {
+		return text
+	}
+	return text[:limit] + "..."
 }
 
 // Invoke parses the message.
@@ -85,13 +93,7 @@ func (p *JSONOutputParser[T]) Stream(ctx context.Context, input *core.AIMessage,
 
 // Batch parses multiple messages.
 func (p *JSONOutputParser[T]) Batch(ctx context.Context, inputs []*core.AIMessage, opts ...core.Option) ([]T, error) {
-	results := make([]T, len(inputs))
-	for i, input := range inputs {
-		result, err := p.Parse(input)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, func(ctx context.Context, input *core.AIMessage, _ ...core.Option) (T, error) {
+		return p.Parse(input)
+	})
 }

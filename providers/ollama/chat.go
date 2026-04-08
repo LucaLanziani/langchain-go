@@ -56,7 +56,7 @@ func (m *ChatModel) BindTools(tools ...llms.ToolDefinition) llms.ChatModel {
 // WithStructuredOutput returns a copy of the model configured for JSON output.
 func (m *ChatModel) WithStructuredOutput(schema map[string]any) llms.ChatModel {
 	cp := *m
-	cp.structuredSchema = schema
+	cp.structuredSchema = core.CloneMap(schema)
 	return &cp
 }
 
@@ -123,15 +123,13 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 
 // Batch performs multiple Invoke calls sequentially.
 func (m *ChatModel) Batch(ctx context.Context, inputs [][]core.Message, opts ...core.Option) ([]*core.AIMessage, error) {
-	results := make([]*core.AIMessage, len(inputs))
-	for i, input := range inputs {
+	return core.Batch(ctx, inputs, opts, func(ctx context.Context, input []core.Message, opts ...core.Option) (*core.AIMessage, error) {
 		result, err := m.Invoke(ctx, input, opts...)
 		if err != nil {
-			return nil, fmt.Errorf("ollama: batch item %d: %w", i, err)
+			return nil, fmt.Errorf("ollama: %w", err)
 		}
-		results[i] = result
-	}
-	return results, nil
+		return result, nil
+	})
 }
 
 // buildRequest constructs the Ollama /api/chat request body.

@@ -78,15 +78,9 @@ func (r *RunnableTool) Stream(ctx context.Context, input string, opts ...core.Op
 
 // Batch runs the tool for multiple inputs.
 func (r *RunnableTool) Batch(ctx context.Context, inputs []string, opts ...core.Option) ([]string, error) {
-	results := make([]string, len(inputs))
-	for i, input := range inputs {
-		result, err := r.tool.Run(ctx, input)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, func(ctx context.Context, input string, _ ...core.Option) (string, error) {
+		return r.tool.Run(ctx, input)
+	})
 }
 
 // ExecuteToolCall executes a tool call from an AI message, looking up the tool by name.

@@ -33,7 +33,6 @@ func (s *WeightedStrategy) SelectProvider(ctx context.Context, reqCtx RequestCon
 	}
 
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 
 	// Get provider names in deterministic order
 	names := make([]string, 0, len(providers))
@@ -44,24 +43,25 @@ func (s *WeightedStrategy) SelectProvider(ctx context.Context, reqCtx RequestCon
 
 	// Calculate total weight
 	totalWeight := 0
-	for _, name := range names {
+	weights := make([]int, len(names))
+	for i, name := range names {
 		weight := s.weights[name]
 		if weight <= 0 {
 			weight = 1 // Default weight
 		}
+		weights[i] = weight
 		totalWeight += weight
 	}
+	s.mu.RUnlock()
 
 	// Select random provider based on weights
+	s.rngMu.Lock()
 	random := s.rng.Intn(totalWeight)
+	s.rngMu.Unlock()
 	cumulative := 0
 
-	for _, name := range names {
-		weight := s.weights[name]
-		if weight <= 0 {
-			weight = 1
-		}
-
+	for i, name := range names {
+		weight := weights[i]
 		cumulative += weight
 
 		if random < cumulative {

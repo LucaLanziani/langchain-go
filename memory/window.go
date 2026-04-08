@@ -59,7 +59,9 @@ func (m *ConversationWindowMemory) LoadMemoryVariables(ctx context.Context, _ ma
 
 	// Keep the last K*2 messages (each turn = 1 human + 1 AI message).
 	windowSize := m.K * 2
-	if len(messages) > windowSize {
+	if windowSize <= 0 {
+		messages = nil
+	} else if len(messages) > windowSize {
 		messages = messages[len(messages)-windowSize:]
 	}
 

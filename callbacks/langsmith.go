@@ -19,12 +19,16 @@ import (
 type LangSmithHandler struct {
 	core.BaseCallbackHandler
 
-	apiKey   string
-	endpoint string
-	project  string
-	client   *http.Client
-	runs     map[string]*langSmithRun
-	mu       sync.Mutex
+	apiKey    string
+	endpoint  string
+	project   string
+	client    *http.Client
+	runs      map[string]*langSmithRun
+	mu        sync.Mutex
+	queueOnce sync.Once
+	queueWG   sync.WaitGroup
+	queue     chan func()
+	closed    bool
 }
 
 type langSmithRun struct {
@@ -130,25 +134,30 @@ func (h *LangSmithHandler) OnRetrieverError(_ context.Context, err error, runID 
 }
 
 func (h *LangSmithHandler) startRun(runID, parentRunID, name, runType string, inputs map[string]any) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	h.initQueue()
 
+	h.mu.Lock()
 	run := &langSmithRun{
 		ID:          runID,
 		Name:        name,
 		RunType:     runType,
-		Inputs:      inputs,
+		Inputs:      core.CloneMap(inputs),
 		StartTime:   time.Now().UTC(),
 		ParentRunID: parentRunID,
 		SessionName: h.project,
 	}
 	h.runs[runID] = run
+	snapshot := cloneLangSmithRun(run)
+	h.mu.Unlock()
 
-	// Post the run start asynchronously.
-	go h.postRun(run)
+	h.enqueue(func() {
+		h.postRun(snapshot)
+	})
 }
 
 func (h *LangSmithHandler) endRun(runID string, outputs map[string]any, errMsg string) {
+	h.initQueue()
+
 	h.mu.Lock()
 	run, ok := h.runs[runID]
 	if !ok {
@@ -157,13 +166,65 @@ func (h *LangSmithHandler) endRun(runID string, outputs map[string]any, errMsg s
 	}
 	now := time.Now().UTC()
 	run.EndTime = &now
-	run.Outputs = outputs
+	run.Outputs = core.CloneMap(outputs)
 	run.Error = errMsg
 	delete(h.runs, runID)
+	snapshot := cloneLangSmithRun(run)
 	h.mu.Unlock()
 
-	// Patch the run asynchronously.
-	go h.patchRun(run)
+	h.enqueue(func() {
+		h.patchRun(snapshot)
+	})
+}
+
+// Flush waits for all queued HTTP work to complete.
+func (h *LangSmithHandler) Flush(ctx context.Context) error {
+	h.initQueue()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.queueWG.Wait()
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Close prevents new events from being queued and flushes pending work.
+func (h *LangSmithHandler) Close(ctx context.Context) error {
+	h.mu.Lock()
+	h.closed = true
+	h.mu.Unlock()
+	return h.Flush(ctx)
+}
+
+func (h *LangSmithHandler) initQueue() {
+	h.queueOnce.Do(func() {
+		h.queue = make(chan func(), 128)
+		go func() {
+			for job := range h.queue {
+				job()
+				h.queueWG.Done()
+			}
+		}()
+	})
+}
+
+func (h *LangSmithHandler) enqueue(job func()) {
+	h.mu.Lock()
+	closed := h.closed
+	h.mu.Unlock()
+	if closed {
+		return
+	}
+
+	h.queueWG.Add(1)
+	h.queue <- job
 }
 
 func (h *LangSmithHandler) postRun(run *langSmithRun) {
@@ -229,4 +290,19 @@ func (h *LangSmithHandler) patchRun(run *langSmithRun) {
 		body, _ := io.ReadAll(resp.Body)
 		log.Printf("langsmith: API error patching run %s (status %d): %s", run.ID, resp.StatusCode, body)
 	}
+}
+
+func cloneLangSmithRun(run *langSmithRun) *langSmithRun {
+	if run == nil {
+		return nil
+	}
+	snapshot := *run
+	snapshot.Inputs = core.CloneMap(run.Inputs)
+	snapshot.Outputs = core.CloneMap(run.Outputs)
+	snapshot.Extra = core.CloneMap(run.Extra)
+	if run.EndTime != nil {
+		end := *run.EndTime
+		snapshot.EndTime = &end
+	}
+	return &snapshot
 }

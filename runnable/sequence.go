@@ -72,15 +72,7 @@ func (s *Sequence[I, O]) Stream(ctx context.Context, input I, opts ...core.Optio
 
 // Batch runs the sequence for multiple inputs.
 func (s *Sequence[I, O]) Batch(ctx context.Context, inputs []I, opts ...core.Option) ([]O, error) {
-	results := make([]O, len(inputs))
-	for i, input := range inputs {
-		result, err := s.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, s.Invoke)
 }
 
 // Pipe2 chains two runnables into a Sequence.

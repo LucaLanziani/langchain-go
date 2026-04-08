@@ -86,6 +86,31 @@ func TestAddDocumentsWithExistingID(t *testing.T) {
 	}
 }
 
+func TestAddDocumentsAssignsGeneratedIDsBackToDocuments(t *testing.T) {
+	ctx := context.Background()
+	store := New(&mockEmbedder{})
+
+	docs := []*core.Document{{PageContent: "generated id"}}
+	ids, err := store.AddDocuments(ctx, docs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if docs[0].ID == "" {
+		t.Fatal("expected generated ID to be written back to the document")
+	}
+	if docs[0].ID != ids[0] {
+		t.Fatalf("expected document ID %q to match returned ID %q", docs[0].ID, ids[0])
+	}
+
+	results, err := store.SimilaritySearch(ctx, "generated id", 1)
+	if err != nil {
+		t.Fatalf("unexpected search error: %v", err)
+	}
+	if results[0].ID != ids[0] {
+		t.Fatalf("expected retrieved document ID %q, got %q", ids[0], results[0].ID)
+	}
+}
+
 func TestSimilaritySearchWithScore(t *testing.T) {
 	ctx := context.Background()
 	store := New(&mockEmbedder{})

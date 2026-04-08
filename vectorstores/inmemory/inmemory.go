@@ -55,6 +55,7 @@ func (s *Store) AddDocuments(ctx context.Context, documents []*core.Document) ([
 		id := doc.ID
 		if id == "" {
 			id = uuid.New().String()
+			doc.ID = id
 		}
 		ids[i] = id
 		s.docs = append(s.docs, storedDoc{

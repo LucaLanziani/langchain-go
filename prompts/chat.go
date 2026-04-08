@@ -129,28 +129,28 @@ func (c *ChatPromptTemplate) FormatMessages(values map[string]any) ([]core.Messa
 			messages = append(messages, msgs...)
 
 		case "system":
-			content, err := formatTemplate(tmpl.Template, merged)
+			content, err := formatRequiredTemplate(tmpl.Template, merged)
 			if err != nil {
 				return nil, err
 			}
 			messages = append(messages, core.NewSystemMessage(content))
 
 		case "human":
-			content, err := formatTemplate(tmpl.Template, merged)
+			content, err := formatRequiredTemplate(tmpl.Template, merged)
 			if err != nil {
 				return nil, err
 			}
 			messages = append(messages, core.NewHumanMessage(content))
 
 		case "ai":
-			content, err := formatTemplate(tmpl.Template, merged)
+			content, err := formatRequiredTemplate(tmpl.Template, merged)
 			if err != nil {
 				return nil, err
 			}
 			messages = append(messages, core.NewAIMessage(content))
 
 		default:
-			content, err := formatTemplate(tmpl.Template, merged)
+			content, err := formatRequiredTemplate(tmpl.Template, merged)
 			if err != nil {
 				return nil, err
 			}
@@ -179,15 +179,9 @@ func (c *ChatPromptTemplate) Stream(ctx context.Context, input map[string]any, o
 
 // Batch formats the template with multiple input maps.
 func (c *ChatPromptTemplate) Batch(ctx context.Context, inputs []map[string]any, opts ...core.Option) ([][]core.Message, error) {
-	results := make([][]core.Message, len(inputs))
-	for i, input := range inputs {
-		result, err := c.FormatMessages(input)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, func(ctx context.Context, input map[string]any, _ ...core.Option) ([]core.Message, error) {
+		return c.FormatMessages(input)
+	})
 }
 
 // formatTemplate replaces {variable} placeholders in a template string.
@@ -202,4 +196,13 @@ func formatTemplate(template string, values map[string]any) (string, error) {
 		result = strings.ReplaceAll(result, "{"+k+"}", fmt.Sprintf("%v", v))
 	}
 	return result, nil
+}
+
+func formatRequiredTemplate(template string, values map[string]any) (string, error) {
+	for _, name := range extractVariables(template) {
+		if _, ok := values[name]; !ok {
+			return "", fmt.Errorf("missing required variable: %s", name)
+		}
+	}
+	return formatTemplate(template, values)
 }

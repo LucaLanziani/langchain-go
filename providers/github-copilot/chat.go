@@ -84,14 +84,14 @@ func (m *ChatModel) GetName() string {
 // BindTools returns a copy of the model with tools bound.
 func (m *ChatModel) BindTools(toolDefs ...llms.ToolDefinition) llms.ChatModel {
 	cp := *m
-	cp.boundTools = append(cp.boundTools, toolDefs...)
+	cp.boundTools = append(append([]llms.ToolDefinition(nil), m.boundTools...), toolDefs...)
 	return &cp
 }
 
 // WithStructuredOutput returns a copy of the model configured for structured output.
 func (m *ChatModel) WithStructuredOutput(schema map[string]any) llms.ChatModel {
 	cp := *m
-	cp.structuredSchema = schema
+	cp.structuredSchema = core.CloneMap(schema)
 	return &cp
 }
 
@@ -223,12 +223,17 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 }
 
 // Batch performs multiple chat completions in parallel.
-// Concurrency is controlled by the MaxConcurrency option (default 5).
+// Concurrency is controlled by core.WithMaxConcurrency at call time and falls
+// back to the model's MaxConcurrency option when unset.
 func (m *ChatModel) Batch(ctx context.Context, inputs [][]core.Message, opts ...core.Option) ([]*core.AIMessage, error) {
 	results := make([]*core.AIMessage, len(inputs))
 	errs := make([]error, len(inputs))
 
-	maxConc := m.opts.MaxConcurrency
+	cfg := core.ApplyOptions(opts...)
+	maxConc := cfg.MaxConcurrency
+	if maxConc <= 0 {
+		maxConc = m.opts.MaxConcurrency
+	}
 	if maxConc <= 0 {
 		maxConc = 5
 	}

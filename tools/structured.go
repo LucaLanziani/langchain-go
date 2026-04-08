@@ -83,85 +83,109 @@ func NewTypedTool[T any](name, description string, argsExample T, fn func(ctx co
 // generateJSONSchema generates a JSON Schema from a Go struct.
 func generateJSONSchema(v any) map[string]any {
 	t := reflect.TypeOf(v)
-	if t.Kind() == reflect.Ptr {
+	if t == nil {
+		return map[string]any{"type": "object"}
+	}
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return map[string]any{"type": "object"}
+	}
+	return schemaForType(t, make(map[reflect.Type]bool))
+}
+
+func schemaForType(t reflect.Type, seen map[reflect.Type]bool) map[string]any {
+	if t == nil {
+		return map[string]any{"type": "object"}
+	}
+	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 
-	if t.Kind() != reflect.Struct {
-		return map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"input": map[string]any{"type": "string"},
-			},
+	switch t.Kind() {
+	case reflect.Struct:
+		if seen[t] {
+			return map[string]any{"type": "object"}
 		}
-	}
+		seen[t] = true
+		defer delete(seen, t)
 
-	properties := make(map[string]any)
-	var required []string
+		properties := make(map[string]any)
+		var required []string
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			if !field.IsExported() {
+				continue
+			}
 
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		if !field.IsExported() {
-			continue
-		}
+			jsonTag := field.Tag.Get("json")
+			if jsonTag == "-" {
+				continue
+			}
 
-		jsonTag := field.Tag.Get("json")
-		if jsonTag == "-" {
-			continue
-		}
-
-		name := field.Name
-		omitempty := false
-		if jsonTag != "" {
-			parts := strings.Split(jsonTag, ",")
-			name = parts[0]
-			for _, p := range parts[1:] {
-				if p == "omitempty" {
-					omitempty = true
+			name := field.Name
+			omitempty := false
+			if jsonTag != "" {
+				parts := strings.Split(jsonTag, ",")
+				if parts[0] != "" {
+					name = parts[0]
 				}
+				for _, part := range parts[1:] {
+					if part == "omitempty" {
+						omitempty = true
+					}
+				}
+			}
+
+			prop := schemaForType(field.Type, seen)
+			applySchemaTags(field, prop)
+			properties[name] = prop
+
+			if !omitempty {
+				required = append(required, name)
 			}
 		}
 
-		prop := map[string]any{}
-
-		// Determine JSON Schema type from Go type.
-		switch field.Type.Kind() {
-		case reflect.String:
-			prop["type"] = "string"
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			prop["type"] = "integer"
-		case reflect.Float32, reflect.Float64:
-			prop["type"] = "number"
-		case reflect.Bool:
-			prop["type"] = "boolean"
-		case reflect.Slice:
-			prop["type"] = "array"
-			elemType := goTypeToJSONType(field.Type.Elem().Kind())
-			prop["items"] = map[string]any{"type": elemType}
-		default:
-			prop["type"] = "object"
+		schema := map[string]any{
+			"type":       "object",
+			"properties": properties,
 		}
-
-		// Use description tag if available.
-		if desc := field.Tag.Get("description"); desc != "" {
-			prop["description"] = desc
+		if len(required) > 0 {
+			schema["required"] = required
 		}
-
-		properties[name] = prop
-
-		if !omitempty {
-			required = append(required, name)
+		return schema
+	case reflect.Slice, reflect.Array:
+		return map[string]any{
+			"type":  "array",
+			"items": schemaForType(t.Elem(), seen),
 		}
+	case reflect.Map:
+		schema := map[string]any{"type": "object"}
+		if t.Key().Kind() == reflect.String {
+			schema["additionalProperties"] = schemaForType(t.Elem(), seen)
+		}
+		return schema
+	default:
+		return map[string]any{"type": goTypeToJSONType(t.Kind())}
 	}
+}
 
-	schema := map[string]any{
-		"type":       "object",
-		"properties": properties,
+func applySchemaTags(field reflect.StructField, prop map[string]any) {
+	if desc := field.Tag.Get("description"); desc != "" {
+		prop["description"] = desc
 	}
-	if len(required) > 0 {
-		schema["required"] = required
+	if format := field.Tag.Get("format"); format != "" {
+		prop["format"] = format
 	}
-	return schema
+	if enum := field.Tag.Get("enum"); enum != "" {
+		parts := strings.Split(enum, ",")
+		values := make([]any, 0, len(parts))
+		for _, part := range parts {
+			values = append(values, strings.TrimSpace(part))
+		}
+		prop["enum"] = values
+	}
 }
 
 // goTypeToJSONType maps Go reflect.Kind to JSON Schema type string.

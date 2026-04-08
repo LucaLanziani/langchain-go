@@ -97,15 +97,7 @@ func (c *LLMChain) Stream(ctx context.Context, input map[string]any, opts ...cor
 
 // Batch runs the chain for multiple inputs.
 func (c *LLMChain) Batch(ctx context.Context, inputs []map[string]any, opts ...core.Option) ([]string, error) {
-	results := make([]string, len(inputs))
-	for i, input := range inputs {
-		result, err := c.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, c.Invoke)
 }
 
 // StuffDocumentsChain combines retrieved documents into a single context
@@ -198,15 +190,7 @@ func (c *StuffDocumentsChain) stuffDocuments(input map[string]any) (map[string]a
 
 // Batch runs the chain for multiple inputs.
 func (c *StuffDocumentsChain) Batch(ctx context.Context, inputs []map[string]any, opts ...core.Option) ([]string, error) {
-	results := make([]string, len(inputs))
-	for i, input := range inputs {
-		result, err := c.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, c.Invoke)
 }
 
 // RetrievalQA combines a retriever with an LLM to answer questions.
@@ -288,18 +272,13 @@ func (r *RetrievalQA) retrieveAndAugment(ctx context.Context, input map[string]a
 	augmented := make(map[string]any, len(input)+1)
 	maps.Copy(augmented, input)
 	augmented["input_documents"] = docs
+	if _, ok := augmented["input"]; !ok {
+		augmented["input"] = query
+	}
 	return augmented, nil
 }
 
 // Batch runs the chain for multiple inputs.
 func (r *RetrievalQA) Batch(ctx context.Context, inputs []map[string]any, opts ...core.Option) ([]string, error) {
-	results := make([]string, len(inputs))
-	for i, input := range inputs {
-		result, err := r.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, r.Invoke)
 }

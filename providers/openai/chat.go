@@ -50,14 +50,14 @@ func (m *ChatModel) GetName() string {
 // BindTools returns a copy of the model with tools bound.
 func (m *ChatModel) BindTools(tools ...llms.ToolDefinition) llms.ChatModel {
 	cp := *m
-	cp.boundTools = append(cp.boundTools, tools...)
+	cp.boundTools = append(append([]llms.ToolDefinition(nil), m.boundTools...), tools...)
 	return &cp
 }
 
 // WithStructuredOutput returns a copy of the model configured for structured output.
 func (m *ChatModel) WithStructuredOutput(schema map[string]any) llms.ChatModel {
 	cp := *m
-	cp.structuredSchema = schema
+	cp.structuredSchema = core.CloneMap(schema)
 	return &cp
 }
 
@@ -124,15 +124,7 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 
 // Batch performs multiple chat completions.
 func (m *ChatModel) Batch(ctx context.Context, inputs [][]core.Message, opts ...core.Option) ([]*core.AIMessage, error) {
-	results := make([]*core.AIMessage, len(inputs))
-	for i, input := range inputs {
-		result, err := m.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, m.Invoke)
 }
 
 // buildRequest constructs the OpenAI API request body.
@@ -414,6 +406,11 @@ func (m *ChatModel) streamResponse(body io.Reader, ch chan<- core.StreamChunk[*c
 				builder.args += tc.Function.Arguments
 			}
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		ch <- core.StreamChunk[*core.AIMessage]{Err: fmt.Errorf("failed to read stream: %w", err)}
+		return
 	}
 
 	// If we accumulated tool calls, send a final message with them.

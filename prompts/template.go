@@ -105,15 +105,9 @@ func (p *PromptTemplate) Stream(ctx context.Context, input map[string]any, opts 
 
 // Batch formats the template with multiple input maps.
 func (p *PromptTemplate) Batch(ctx context.Context, inputs []map[string]any, opts ...core.Option) ([]string, error) {
-	results := make([]string, len(inputs))
-	for i, input := range inputs {
-		result, err := p.Format(input)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, func(ctx context.Context, input map[string]any, _ ...core.Option) (string, error) {
+		return p.Format(input)
+	})
 }
 
 // extractVariables finds all {variable} placeholders in a template string.

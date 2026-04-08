@@ -9,10 +9,12 @@ type ProviderStats struct {
 	ProviderName   string        // Name of the provider
 	RequestCount   int64         // Total number of requests
 	ErrorCount     int64         // Total number of errors
+	CancelledCount int64         // Total number of cancelled requests
 	SuccessCount   int64         // Total number of successful requests
 	TotalLatency   time.Duration // Cumulative latency
 	AverageLatency time.Duration // Average latency per request
 	ErrorRate      float64       // Error rate (0.0 to 1.0)
+	CancelledRate  float64       // Cancelled rate (0.0 to 1.0)
 	SuccessRate    float64       // Success rate (0.0 to 1.0)
 	LastUsed       time.Time     // Last usage timestamp
 }
@@ -29,19 +31,21 @@ func (m *RouterMetrics) GetStats(providerName string) *ProviderStats {
 	}
 
 	errorCount := m.ErrorCount[providerName]
+	cancelledCount := m.CancelledCount[providerName]
 	totalLatency := m.TotalLatency[providerName]
 	lastUsed := m.LastUsed[providerName]
 
-	successCount := requestCount - errorCount
+	successCount := requestCount - errorCount - cancelledCount
 
 	var avgLatency time.Duration
 	if requestCount > 0 {
 		avgLatency = totalLatency / time.Duration(requestCount)
 	}
 
-	var errorRate, successRate float64
+	var errorRate, cancelledRate, successRate float64
 	if requestCount > 0 {
 		errorRate = float64(errorCount) / float64(requestCount)
+		cancelledRate = float64(cancelledCount) / float64(requestCount)
 		successRate = float64(successCount) / float64(requestCount)
 	}
 
@@ -49,10 +53,12 @@ func (m *RouterMetrics) GetStats(providerName string) *ProviderStats {
 		ProviderName:   providerName,
 		RequestCount:   requestCount,
 		ErrorCount:     errorCount,
+		CancelledCount: cancelledCount,
 		SuccessCount:   successCount,
 		TotalLatency:   totalLatency,
 		AverageLatency: avgLatency,
 		ErrorRate:      errorRate,
+		CancelledRate:  cancelledRate,
 		SuccessRate:    successRate,
 		LastUsed:       lastUsed,
 	}
@@ -69,19 +75,21 @@ func (m *RouterMetrics) GetAllStats() map[string]*ProviderStats {
 	for providerName := range m.RequestCount {
 		requestCount := m.RequestCount[providerName]
 		errorCount := m.ErrorCount[providerName]
+		cancelledCount := m.CancelledCount[providerName]
 		totalLatency := m.TotalLatency[providerName]
 		lastUsed := m.LastUsed[providerName]
 
-		successCount := requestCount - errorCount
+		successCount := requestCount - errorCount - cancelledCount
 
 		var avgLatency time.Duration
 		if requestCount > 0 {
 			avgLatency = totalLatency / time.Duration(requestCount)
 		}
 
-		var errorRate, successRate float64
+		var errorRate, cancelledRate, successRate float64
 		if requestCount > 0 {
 			errorRate = float64(errorCount) / float64(requestCount)
+			cancelledRate = float64(cancelledCount) / float64(requestCount)
 			successRate = float64(successCount) / float64(requestCount)
 		}
 
@@ -89,10 +97,12 @@ func (m *RouterMetrics) GetAllStats() map[string]*ProviderStats {
 			ProviderName:   providerName,
 			RequestCount:   requestCount,
 			ErrorCount:     errorCount,
+			CancelledCount: cancelledCount,
 			SuccessCount:   successCount,
 			TotalLatency:   totalLatency,
 			AverageLatency: avgLatency,
 			ErrorRate:      errorRate,
+			CancelledRate:  cancelledRate,
 			SuccessRate:    successRate,
 			LastUsed:       lastUsed,
 		}
@@ -109,6 +119,7 @@ func (m *RouterMetrics) Reset(providerName string) {
 
 	delete(m.RequestCount, providerName)
 	delete(m.ErrorCount, providerName)
+	delete(m.CancelledCount, providerName)
 	delete(m.TotalLatency, providerName)
 	delete(m.LastUsed, providerName)
 }
@@ -120,6 +131,7 @@ func (m *RouterMetrics) ResetAll() {
 
 	m.RequestCount = make(map[string]int64)
 	m.ErrorCount = make(map[string]int64)
+	m.CancelledCount = make(map[string]int64)
 	m.TotalLatency = make(map[string]time.Duration)
 	m.LastUsed = make(map[string]time.Time)
 }

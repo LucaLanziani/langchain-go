@@ -14,6 +14,9 @@ type AgentAction struct {
 	// ToolInput is the input to pass to the tool (may be JSON).
 	ToolInput string `json:"tool_input"`
 
+	// ToolCallID is the provider-issued identifier for this tool call.
+	ToolCallID string `json:"tool_call_id,omitempty"`
+
 	// Log is additional information about why this action was taken.
 	Log string `json:"log"`
 

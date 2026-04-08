@@ -79,13 +79,5 @@ func (b *Branch[I, O]) Stream(ctx context.Context, input I, opts ...core.Option)
 
 // Batch runs the branch for multiple inputs.
 func (b *Branch[I, O]) Batch(ctx context.Context, inputs []I, opts ...core.Option) ([]O, error) {
-	results := make([]O, len(inputs))
-	for i, input := range inputs {
-		result, err := b.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, b.Invoke)
 }

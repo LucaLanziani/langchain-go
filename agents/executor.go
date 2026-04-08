@@ -203,15 +203,7 @@ func (e *AgentExecutor) Stream(ctx context.Context, input map[string]any, opts .
 
 // Batch runs the agent for multiple inputs.
 func (e *AgentExecutor) Batch(ctx context.Context, inputs []map[string]any, opts ...core.Option) ([]map[string]any, error) {
-	results := make([]map[string]any, len(inputs))
-	for i, input := range inputs {
-		result, err := e.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, e.Invoke)
 }
 
 func (e *AgentExecutor) availableToolNames() string {

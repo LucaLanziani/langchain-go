@@ -1638,6 +1638,68 @@ func TestProperty23_LLMRoutingDeterminismWithCache(t *testing.T) {
 	})
 }
 
+func TestLLMRoutingStrategyCoalescesConcurrentCacheMisses(t *testing.T) {
+	ctx := context.Background()
+	mockLLM := &mockLLMForRouting{
+		invokeFunc: func(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.AIMessage, error) {
+			time.Sleep(25 * time.Millisecond)
+			return core.NewAIMessage("anthropic"), nil
+		},
+	}
+	providers := map[string]llms.ChatModel{
+		"openai":    &mockProviderForRouting{name: "openai"},
+		"anthropic": &mockProviderForRouting{name: "anthropic"},
+	}
+	strategy := &LLMRoutingStrategy{
+		model:     mockLLM,
+		providers: []string{"openai", "anthropic"},
+		providerDescriptions: map[string]string{
+			"openai":    "Fast",
+			"anthropic": "Capable",
+		},
+		cacheTTL: 5 * time.Minute,
+	}
+	reqCtx := RequestContext{
+		Messages:     []core.Message{core.NewHumanMessage("route me")},
+		MessageCount: 1,
+		TotalTokens:  10,
+		Priority:     "medium",
+		Complexity:   "simple",
+	}
+
+	const concurrency = 50
+	var wg sync.WaitGroup
+	results := make(chan string, concurrency)
+	errs := make(chan error, concurrency)
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			providerName, err := strategy.SelectProvider(ctx, reqCtx, providers)
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- providerName
+		}()
+	}
+	wg.Wait()
+	close(results)
+	close(errs)
+
+	for err := range errs {
+		t.Fatalf("unexpected coalesced routing error: %v", err)
+	}
+	for providerName := range results {
+		if providerName != "anthropic" {
+			t.Fatalf("expected all coalesced requests to route to anthropic, got %q", providerName)
+		}
+	}
+	if invocations := mockLLM.GetInvocations(); invocations != 1 {
+		t.Fatalf("expected exactly 1 LLM invocation, got %d", invocations)
+	}
+}
+
 // ===== Unit Tests for LLM Routing Strategy =====
 // These tests validate specific scenarios and edge cases for Requirements 11.1-11.7, 23.1-23.5
 

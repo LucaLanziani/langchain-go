@@ -4,7 +4,6 @@ package retrievers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/LucaLanziani/langchain-go/core"
 	"github.com/LucaLanziani/langchain-go/vectorstores"
@@ -76,15 +75,9 @@ func (r *VectorStoreRetriever) Stream(ctx context.Context, input string, opts ..
 
 // Batch retrieves documents for multiple queries.
 func (r *VectorStoreRetriever) Batch(ctx context.Context, inputs []string, opts ...core.Option) ([][]*core.Document, error) {
-	results := make([][]*core.Document, len(inputs))
-	for i, input := range inputs {
-		docs, err := r.GetRelevantDocuments(ctx, input)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = docs
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, func(ctx context.Context, input string, _ ...core.Option) ([]*core.Document, error) {
+		return r.GetRelevantDocuments(ctx, input)
+	})
 }
 
 // Ensure VectorStoreRetriever implements Retriever.

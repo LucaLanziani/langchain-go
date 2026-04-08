@@ -130,6 +130,19 @@ func TestChatPromptTemplateWithPartialVariables(t *testing.T) {
 	}
 }
 
+func TestChatPromptTemplatePartialVariablesCanBeOverridden(t *testing.T) {
+	prompt := NewChatPromptTemplate(Human("{greeting}, {name}!"))
+	prompt.WithPartialVariables(map[string]any{"greeting": "Hello", "name": "World"})
+
+	msgs, err := prompt.FormatMessages(map[string]any{"name": "Go"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if msgs[0].GetContent() != "Hello, Go!" {
+		t.Fatalf("expected runtime input to override partial variable, got %q", msgs[0].GetContent())
+	}
+}
+
 func TestChatPromptTemplateAIMessage(t *testing.T) {
 	prompt := NewChatPromptTemplate(AI("I am {bot}"))
 
@@ -153,6 +166,14 @@ func TestChatPromptTemplatePlaceholderInvalidType(t *testing.T) {
 	_, err := prompt.FormatMessages(map[string]any{"history": "not a slice"})
 	if err == nil {
 		t.Error("expected error for invalid placeholder type")
+	}
+}
+
+func TestChatPromptTemplateMissingVariable(t *testing.T) {
+	prompt := NewChatPromptTemplate(Human("Hello, {name}!"))
+	_, err := prompt.FormatMessages(map[string]any{})
+	if err == nil {
+		t.Fatal("expected missing required variable error")
 	}
 }
 

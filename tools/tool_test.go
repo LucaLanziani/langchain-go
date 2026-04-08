@@ -274,3 +274,41 @@ func TestGenerateJSONSchemaBoolType(t *testing.T) {
 		t.Errorf("expected 'boolean', got %v", p["type"])
 	}
 }
+
+type nestedContact struct {
+	Email string `json:"email" format:"email"`
+}
+
+type nestedSchemaArgs struct {
+	User struct {
+		Name    string        `json:"name"`
+		Status  string        `json:"status" enum:"active,inactive"`
+		Contact nestedContact `json:"contact"`
+	} `json:"user"`
+	Aliases []nestedContact `json:"aliases,omitempty"`
+}
+
+func TestGenerateJSONSchemaNestedStructs(t *testing.T) {
+	tool := NewTypedTool("nested", "nested schema", nestedSchemaArgs{},
+		func(_ context.Context, args nestedSchemaArgs) (string, error) { return args.User.Name, nil },
+	)
+	schema := tool.ArgsSchema()
+	user := schema["properties"].(map[string]any)["user"].(map[string]any)
+	userProps := user["properties"].(map[string]any)
+	status := userProps["status"].(map[string]any)
+	contact := userProps["contact"].(map[string]any)
+	aliases := schema["properties"].(map[string]any)["aliases"].(map[string]any)
+
+	if user["type"] != "object" {
+		t.Fatalf("expected nested user schema to be object, got %v", user["type"])
+	}
+	if status["enum"].([]any)[0] != "active" {
+		t.Fatalf("expected enum values to be preserved, got %v", status["enum"])
+	}
+	if contact["properties"].(map[string]any)["email"].(map[string]any)["format"] != "email" {
+		t.Fatalf("expected nested format tag to be preserved")
+	}
+	if aliases["items"].(map[string]any)["properties"].(map[string]any)["email"].(map[string]any)["format"] != "email" {
+		t.Fatalf("expected slice items to recurse into nested structs")
+	}
+}

@@ -28,19 +28,17 @@ func (s *LLMRoutingStrategy) SelectProvider(ctx context.Context, reqCtx RequestC
 	// Step 1: Generate cache key from request characteristics
 	cacheKey := s.generateCacheKey(reqCtx)
 
-	// Step 2: Check cache for recent routing decision
-	s.mu.RLock()
-	if entry, found := s.cache[cacheKey]; found {
-		// Check if cache entry is still valid
-		if time.Now().Before(entry.expiresAt) {
-			// Validate cached provider still exists
-			if _, exists := providers[entry.providerName]; exists {
-				s.mu.RUnlock()
-				return entry.providerName, nil
-			}
-		}
+	pending, waitForLeader, providerName, err := s.prepareRequest(cacheKey, providers)
+	if pending == nil {
+		return providerName, err
 	}
-	s.mu.RUnlock()
+	if waitForLeader {
+		providerName, err = s.waitForPending(ctx, pending, providers)
+		if providerName == "" && err != nil {
+			return anyKey(providers), err
+		}
+		return providerName, err
+	}
 
 	// Step 3: Build prompt for LLM routing decision
 	systemPrompt := s.systemPrompt
@@ -59,42 +57,95 @@ func (s *LLMRoutingStrategy) SelectProvider(ctx context.Context, reqCtx RequestC
 	response, err := s.model.Invoke(ctx, messages)
 	if err != nil {
 		// Fallback to first available provider if LLM fails
-		return anyKey(providers), fmt.Errorf("LLM routing failed: %w", err)
+		pending.err = fmt.Errorf("LLM routing failed: %w", err)
+		s.completeRequest(cacheKey, pending, "", nil)
+		return anyKey(providers), pending.err
 	}
 
 	// Step 5: Parse LLM response to extract provider name
-	providerName := s.parseProviderName(response.Content)
+	providerName = s.parseProviderName(response.Content)
 
 	// Step 6: Validate provider exists
 	if _, exists := providers[providerName]; !exists {
 		// LLM returned invalid provider, use first available
-		return anyKey(providers), fmt.Errorf("%w: LLM returned invalid provider %s", ErrInvalidProviderFromLLM, providerName)
+		pending.err = fmt.Errorf("%w: LLM returned invalid provider %s", ErrInvalidProviderFromLLM, providerName)
+		s.completeRequest(cacheKey, pending, "", nil)
+		return anyKey(providers), pending.err
 	}
 
 	// Step 7: Cache the routing decision
-	s.mu.Lock()
-	if s.cache == nil {
-		s.cache = make(map[string]*llmCacheEntry)
-	}
-
-	// Cleanup expired entries periodically to prevent unbounded growth
-	// Only cleanup if cache is getting large (>100 entries)
-	if len(s.cache) > 100 {
-		now := time.Now()
-		for key, entry := range s.cache {
-			if now.After(entry.expiresAt) {
-				delete(s.cache, key)
-			}
-		}
-	}
-
-	s.cache[cacheKey] = &llmCacheEntry{
+	s.completeRequest(cacheKey, pending, providerName, &llmCacheEntry{
 		providerName: providerName,
 		expiresAt:    time.Now().Add(s.cacheTTL),
-	}
-	s.mu.Unlock()
+	})
 
 	return providerName, nil
+}
+
+func (s *LLMRoutingStrategy) prepareRequest(cacheKey string, providers map[string]llms.ChatModel) (*llmPendingCall, bool, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if entry, found := s.cache[cacheKey]; found {
+		if time.Now().Before(entry.expiresAt) {
+			if _, exists := providers[entry.providerName]; exists {
+				return nil, false, entry.providerName, nil
+			}
+		}
+		delete(s.cache, cacheKey)
+	}
+
+	if s.inFlight == nil {
+		s.inFlight = make(map[string]*llmPendingCall)
+	}
+	if pending, found := s.inFlight[cacheKey]; found {
+		return pending, true, "", nil
+	}
+
+	pending := &llmPendingCall{done: make(chan struct{})}
+	s.inFlight[cacheKey] = pending
+	return pending, false, "", nil
+}
+
+func (s *LLMRoutingStrategy) waitForPending(ctx context.Context, pending *llmPendingCall, providers map[string]llms.ChatModel) (string, error) {
+	select {
+	case <-pending.done:
+		if pending.providerName == "" {
+			return "", pending.err
+		}
+		if _, exists := providers[pending.providerName]; !exists {
+			return anyKey(providers), fmt.Errorf("%w: provider %s no longer available", ErrInvalidProviderFromLLM, pending.providerName)
+		}
+		return pending.providerName, pending.err
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
+func (s *LLMRoutingStrategy) completeRequest(cacheKey string, pending *llmPendingCall, providerName string, entry *llmCacheEntry) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if entry != nil {
+		if s.cache == nil {
+			s.cache = make(map[string]*llmCacheEntry)
+		}
+		if len(s.cache) > 100 {
+			now := time.Now()
+			for key, cachedEntry := range s.cache {
+				if now.After(cachedEntry.expiresAt) {
+					delete(s.cache, key)
+				}
+			}
+		}
+		s.cache[cacheKey] = entry
+	}
+
+	if pending != nil {
+		pending.providerName = providerName
+		close(pending.done)
+		delete(s.inFlight, cacheKey)
+	}
 }
 
 // OnSuccess is a no-op for LLMRoutingStrategy.
@@ -207,8 +258,13 @@ func (s *LLMRoutingStrategy) parseProviderName(response string) string {
 // anyKey returns any key from the providers map.
 // Used as a fallback when LLM routing fails.
 func anyKey(providers map[string]llms.ChatModel) string {
+	names := make([]string, 0, len(providers))
 	for name := range providers {
-		return name
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) > 0 {
+		return names[0]
 	}
 	return ""
 }

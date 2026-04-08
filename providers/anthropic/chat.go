@@ -52,14 +52,14 @@ func (m *ChatModel) GetName() string {
 // BindTools returns a copy of the model with tools bound.
 func (m *ChatModel) BindTools(tools ...llms.ToolDefinition) llms.ChatModel {
 	cp := *m
-	cp.boundTools = append(cp.boundTools, tools...)
+	cp.boundTools = append(append([]llms.ToolDefinition(nil), m.boundTools...), tools...)
 	return &cp
 }
 
 // WithStructuredOutput returns a copy configured for structured output.
 func (m *ChatModel) WithStructuredOutput(schema map[string]any) llms.ChatModel {
 	cp := *m
-	cp.structuredSchema = schema
+	cp.structuredSchema = core.CloneMap(schema)
 	return &cp
 }
 
@@ -78,7 +78,10 @@ func (m *ChatModel) Invoke(ctx context.Context, input []core.Message, opts ...co
 // Generate performs a chat completion with full result details.
 func (m *ChatModel) Generate(ctx context.Context, messages []core.Message, opts ...core.Option) (*llms.ChatResult, error) {
 	cfg := core.ApplyOptions(opts...)
-	reqBody := m.buildRequest(messages, cfg, false)
+	reqBody, err := m.buildRequest(messages, cfg, false)
+	if err != nil {
+		return nil, err
+	}
 
 	respBody, err := m.doRequest(ctx, "/messages", reqBody)
 	if err != nil {
@@ -91,7 +94,10 @@ func (m *ChatModel) Generate(ctx context.Context, messages []core.Message, opts 
 // Stream sends messages and streams the response.
 func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...core.Option) (*core.StreamIterator[*core.AIMessage], error) {
 	cfg := core.ApplyOptions(opts...)
-	reqBody := m.buildRequest(input, cfg, true)
+	reqBody, err := m.buildRequest(input, cfg, true)
+	if err != nil {
+		return nil, err
+	}
 
 	reqJSON, err := json.Marshal(reqBody)
 	if err != nil {
@@ -126,19 +132,11 @@ func (m *ChatModel) Stream(ctx context.Context, input []core.Message, opts ...co
 
 // Batch performs multiple chat completions.
 func (m *ChatModel) Batch(ctx context.Context, inputs [][]core.Message, opts ...core.Option) ([]*core.AIMessage, error) {
-	results := make([]*core.AIMessage, len(inputs))
-	for i, input := range inputs {
-		result, err := m.Invoke(ctx, input, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results[i] = result
-	}
-	return results, nil
+	return core.Batch(ctx, inputs, opts, m.Invoke)
 }
 
 // buildRequest constructs the Anthropic API request body.
-func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConfig, stream bool) map[string]any {
+func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConfig, stream bool) (map[string]any, error) {
 	model := m.opts.Model
 	if v, ok := cfg.Configurable[llms.ConfigKeyModel]; ok {
 		if s, ok := v.(string); ok {
@@ -204,8 +202,11 @@ func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConf
 	// Extended Thinking: when enabled, temperature must be 1 and top_p/top_k
 	// must not be set (Anthropic API requirement).
 	if m.opts.ThinkingBudget > 0 {
+		if err := validateThinkingConfig(cfg, m.opts); err != nil {
+			return nil, err
+		}
 		req["thinking"] = map[string]any{
-			"type":         "enabled",
+			"type":          "enabled",
 			"budget_tokens": m.opts.ThinkingBudget,
 		}
 		req["temperature"] = 1 // forced; overrides any Temperature option
@@ -226,7 +227,7 @@ func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConf
 		req["tools"] = tools
 	}
 
-	return req
+	return req, nil
 }
 
 // messageToAPI converts a core.Message to the Anthropic API format.
@@ -368,12 +369,15 @@ func (m *ChatModel) parseResponse(body []byte) (*llms.ChatResult, error) {
 // responseToMessage converts an Anthropic response to a core.AIMessage.
 func (m *ChatModel) responseToMessage(resp *anthropicResponse) *core.AIMessage {
 	var content strings.Builder
+	var thinking strings.Builder
 	var toolCalls []core.ToolCall
 
 	for _, block := range resp.Content {
 		switch block.Type {
 		case "text":
 			content.WriteString(block.Text)
+		case "thinking":
+			thinking.WriteString(block.Text)
 		case "tool_use":
 			argsJSON, _ := json.Marshal(block.Input)
 			toolCalls = append(toolCalls, core.ToolCall{
@@ -385,10 +389,37 @@ func (m *ChatModel) responseToMessage(resp *anthropicResponse) *core.AIMessage {
 		}
 	}
 
+	var message *core.AIMessage
 	if len(toolCalls) > 0 {
-		return core.NewAIMessageWithToolCalls(content.String(), toolCalls)
+		message = core.NewAIMessageWithToolCalls(content.String(), toolCalls)
+	} else {
+		message = core.NewAIMessage(content.String())
 	}
-	return core.NewAIMessage(content.String())
+	if thinking.Len() > 0 {
+		if message.AdditionalKwargs == nil {
+			message.AdditionalKwargs = make(map[string]any)
+		}
+		message.AdditionalKwargs["thinking"] = thinking.String()
+	}
+	return message
+}
+
+func validateThinkingConfig(cfg *core.RunnableConfig, opts *Options) error {
+	if temp, ok := cfg.Configurable[llms.ConfigKeyTemperature]; ok {
+		if value, ok := temp.(float64); ok && value != 1 {
+			return fmt.Errorf("anthropic: thinking budget requires temperature=1")
+		}
+	}
+	if opts.Temperature != nil && *opts.Temperature != 1 {
+		return fmt.Errorf("anthropic: thinking budget requires temperature=1")
+	}
+	if _, ok := cfg.Configurable[llms.ConfigKeyTopP]; ok {
+		return fmt.Errorf("anthropic: thinking budget is incompatible with top_p")
+	}
+	if opts.TopP != nil {
+		return fmt.Errorf("anthropic: thinking budget is incompatible with top_p")
+	}
+	return nil
 }
 
 // streamResponse reads SSE events from the Anthropic streaming response.

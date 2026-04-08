@@ -3,6 +3,8 @@ package provider
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 )
 
 // Sentinel errors for provider operations
@@ -147,6 +149,40 @@ func (e *FallbackError) Error() string {
 
 func (e *FallbackError) Unwrap() error {
 	return e.Err
+}
+
+// BatchError reports per-item failures from Router.Batch while preserving partial results.
+type BatchError struct {
+	FailedItems map[int]error
+}
+
+func (e *BatchError) Error() string {
+	if len(e.FailedItems) == 0 {
+		return "batch error"
+	}
+	indexes := make([]int, 0, len(e.FailedItems))
+	for idx := range e.FailedItems {
+		indexes = append(indexes, idx)
+	}
+	sort.Ints(indexes)
+
+	parts := make([]string, 0, len(indexes))
+	for _, idx := range indexes {
+		parts = append(parts, fmt.Sprintf("item %d: %v", idx, e.FailedItems[idx]))
+	}
+	return fmt.Sprintf("batch error (%d failed): %s", len(indexes), strings.Join(parts, "; "))
+}
+
+func (e *BatchError) Unwrap() error {
+	if len(e.FailedItems) == 0 {
+		return nil
+	}
+	indexes := make([]int, 0, len(e.FailedItems))
+	for idx := range e.FailedItems {
+		indexes = append(indexes, idx)
+	}
+	sort.Ints(indexes)
+	return e.FailedItems[indexes[0]]
 }
 
 // NewValidationError creates a new validation error

@@ -442,6 +442,21 @@ func TestBindTools(t *testing.T) {
 	}
 }
 
+func TestBindToolsDoesNotAliasDerivedModels(t *testing.T) {
+	m := &ChatModel{opts: defaultOptions(), boundTools: make([]llms.ToolDefinition, 1, 4)}
+	m.boundTools[0] = llms.ToolDefinition{Name: "base"}
+
+	left := m.BindTools(llms.ToolDefinition{Name: "left"}).(*ChatModel)
+	right := m.BindTools(llms.ToolDefinition{Name: "right"}).(*ChatModel)
+
+	if left.boundTools[1].Name != "left" {
+		t.Fatalf("expected left tool to remain isolated, got %q", left.boundTools[1].Name)
+	}
+	if right.boundTools[1].Name != "right" {
+		t.Fatalf("expected right tool to remain isolated, got %q", right.boundTools[1].Name)
+	}
+}
+
 // ---------- ChatModel.WithStructuredOutput ----------
 
 func TestWithStructuredOutput(t *testing.T) {
@@ -466,6 +481,24 @@ func TestWithStructuredOutput(t *testing.T) {
 	}
 	if captured.Format != "json" {
 		t.Errorf("expected format 'json', got %q", captured.Format)
+	}
+}
+
+func TestWithStructuredOutputClonesSchema(t *testing.T) {
+	m := &ChatModel{opts: defaultOptions()}
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"name": map[string]any{"type": "string"},
+		},
+	}
+
+	structured := m.WithStructuredOutput(schema).(*ChatModel)
+	schema["properties"].(map[string]any)["name"].(map[string]any)["type"] = "integer"
+
+	got := structured.structuredSchema["properties"].(map[string]any)["name"].(map[string]any)["type"]
+	if got != "string" {
+		t.Fatalf("expected cloned schema to remain unchanged, got %v", got)
 	}
 }
 

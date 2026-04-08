@@ -233,3 +233,38 @@ func TestConversationWindowMemoryVariables(t *testing.T) {
 		t.Errorf("expected [history], got %v", keys)
 	}
 }
+
+func TestConversationWindowMemoryNonPositiveK(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		name string
+		k    int
+	}{
+		{name: "zero", k: 0},
+		{name: "negative", k: -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mem := NewConversationWindowMemory(tt.k)
+			mem.ReturnMessages = true
+			for i := 0; i < 2; i++ {
+				if err := mem.SaveContext(ctx, map[string]any{"input": "hello"}, map[string]any{"output": "world"}); err != nil {
+					t.Fatalf("SaveContext error: %v", err)
+				}
+			}
+
+			vars, err := mem.LoadMemoryVariables(ctx, nil)
+			if err != nil {
+				t.Fatalf("LoadMemoryVariables error: %v", err)
+			}
+			messages, ok := vars["history"].([]core.Message)
+			if !ok {
+				t.Fatalf("expected []core.Message, got %T", vars["history"])
+			}
+			if len(messages) != 0 {
+				t.Fatalf("expected empty history for K=%d, got %d messages", tt.k, len(messages))
+			}
+		})
+	}
+}
