@@ -358,6 +358,10 @@ func (m *ChatModel) buildSessionConfig(ctx context.Context, messages []core.Mess
 			Parameters:  td.Parameters,
 		})
 	}
+
+	// De-duplicate tools by name, preferring entries with handlers (from bridged tools).
+	sdkTools = deduplicateTools(sdkTools)
+
 	sessionCfg.AvailableTools = toolNames(sdkTools)
 	sessionCfg.ExcludedTools = builtInToolNames()
 
@@ -460,6 +464,42 @@ func bridgeTools(ctx context.Context, langchainTools []tools.Tool) []copilot.Too
 	}
 
 	return sdkTools
+}
+
+// deduplicateTools removes duplicate tool entries by name, preferring tools with
+// non-nil handlers (which are the bridged tools with executable implementations).
+func deduplicateTools(tools []copilot.Tool) []copilot.Tool {
+	seen := make(map[string]copilot.Tool)
+
+	// First pass: collect all tools by name, prioritizing those with handlers.
+	for _, tool := range tools {
+		if tool.Name == "" {
+			continue
+		}
+		existing, found := seen[tool.Name]
+		// Keep the tool if:
+		// 1. We haven't seen this name yet, OR
+		// 2. The new tool has a handler and the existing one doesn't
+		if !found || (tool.Handler != nil && existing.Handler == nil) {
+			seen[tool.Name] = tool
+		}
+	}
+
+	// Second pass: rebuild the tools slice preserving order of first occurrence.
+	result := make([]copilot.Tool, 0, len(seen))
+	seenOrder := make(map[string]struct{})
+	for _, tool := range tools {
+		if tool.Name == "" {
+			continue
+		}
+		if _, ok := seenOrder[tool.Name]; ok {
+			continue
+		}
+		seenOrder[tool.Name] = struct{}{}
+		result = append(result, seen[tool.Name])
+	}
+
+	return result
 }
 
 // extractSystemMessage finds the first system message content.
