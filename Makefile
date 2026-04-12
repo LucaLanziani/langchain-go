@@ -1,4 +1,4 @@
-.PHONY: help build test fmt vet lint clean run
+.PHONY: help build test fmt vet lint clean run release
 
 # Default target
 help:
@@ -10,6 +10,7 @@ help:
 	@echo "  make lint     - Run golangci-lint (if installed)"
 	@echo "  make clean    - Remove build artifacts"
 	@echo "  make run      - Run the main application"
+	@echo "  make release  - Create and push a release tag (VERSION=x.y.z)"
 
 # Build the project
 build:
@@ -17,7 +18,7 @@ build:
 
 # Run tests
 test:
-	go test -v -race -coverprofile=coverage.out ./...
+	go test -v -race ./...
 
 # Format code
 fmt:
@@ -40,3 +41,18 @@ clean:
 # Run the main application (adjust path as needed)
 run:
 	go run ./...
+
+releases:
+	git tag --list
+
+# Create and push a release tag
+# Usage: make release VERSION=v1.0.0
+release: fmt vet test
+ifndef VERSION
+	@echo "Error: VERSION not specified. Usage: make release VERSION=vX.Y.Z"
+	@exit 1
+endif
+	@echo "Creating release tag: $(VERSION)"
+	git tag -a $(VERSION) -m "Release $(VERSION)"
+	git push origin $(VERSION)
+	@echo "Release $(VERSION) created and pushed successfully"
