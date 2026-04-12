@@ -38,7 +38,9 @@ type Options struct {
 	Stop []string
 
 	// Tools are langchain Tool implementations that get bridged to SDK tool handlers.
-	// When set, the SDK manages the full tool-calling loop internally.
+	// Only these tools, plus any llms.ToolDefinition values bound via BindTools,
+	// are exposed to the Copilot session. Built-in Copilot CLI tools are disabled
+	// by default.
 	Tools []tools.Tool
 
 	// ReasoningEffort controls the effort the model spends on reasoning.
@@ -92,7 +94,8 @@ func WithMaxConcurrency(n int) OptionFunc {
 
 // WithTools sets langchain Tool implementations that get bridged to SDK tool handlers.
 // The SDK manages the full tool-calling loop internally, so Invoke returns the
-// final response after all tool calls are resolved.
+// final response after all tool calls are resolved. The Copilot session only
+// exposes explicitly configured tools.
 func WithTools(t ...tools.Tool) OptionFunc {
 	return func(o *Options) { o.Tools = append(o.Tools, t...) }
 }

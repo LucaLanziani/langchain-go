@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/LucaLanziani/langchain-go/core"
@@ -374,12 +375,16 @@ func TestStream_ToolCalls(t *testing.T) {
 // ---------- ChatModel.Batch ----------
 
 func TestBatch(t *testing.T) {
+	var mu sync.Mutex
 	callCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		callCount++
+		count := callCount
+		mu.Unlock()
 		jsonResponse(t, w, chatResponse{
 			Done:    true,
-			Message: ollamaMessage{Role: "assistant", Content: fmt.Sprintf("response %d", callCount)},
+			Message: ollamaMessage{Role: "assistant", Content: fmt.Sprintf("response %d", count)},
 		})
 	}))
 	defer srv.Close()
@@ -396,9 +401,11 @@ func TestBatch(t *testing.T) {
 	if len(results) != 3 {
 		t.Errorf("expected 3 results, got %d", len(results))
 	}
+	mu.Lock()
 	if callCount != 3 {
 		t.Errorf("expected 3 API calls, got %d", callCount)
 	}
+	mu.Unlock()
 }
 
 // ---------- ChatModel.BindTools ----------

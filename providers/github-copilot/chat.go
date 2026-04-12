@@ -19,6 +19,41 @@ import (
 // Ensure ChatModel implements llms.ChatModel.
 var _ llms.ChatModel = (*ChatModel)(nil)
 
+var copilotBuiltInToolNames = []string{
+	"bash",
+	"powershell",
+	"read_bash",
+	"read_powershell",
+	"write_bash",
+	"write_powershell",
+	"stop_bash",
+	"stop_powershell",
+	"list_bash",
+	"list_powershell",
+	"view",
+	"create",
+	"edit",
+	"apply_patch",
+	"task",
+	"read_agent",
+	"list_agents",
+	"grep",
+	"rg",
+	"glob",
+	"web_fetch",
+	"skill",
+	"ask_user",
+	"report_intent",
+	"show_file",
+	"fetch_copilot_cli_documentation",
+	"update_todo",
+	"store_memory",
+	"task_complete",
+	"exit_plan_mode",
+	"sql",
+	"lsp",
+}
+
 // ChatModel is the GitHub Copilot chat model implementation backed by the Copilot SDK.
 type ChatModel struct {
 	opts             *Options
@@ -44,15 +79,7 @@ func New(ctx context.Context, optFns ...OptionFunc) (*ChatModel, error) {
 		}
 	}
 
-	clientOpts := &copilot.ClientOptions{
-		LogLevel: opts.LogLevel,
-	}
-	if opts.GithubToken != "" {
-		clientOpts.GitHubToken = opts.GithubToken
-	}
-	if opts.CLIPath != "" {
-		clientOpts.CLIPath = opts.CLIPath
-	}
+	clientOpts := buildClientOptions(opts)
 
 	client := copilot.NewClient(clientOpts)
 	if err := client.Start(ctx); err != nil {
@@ -332,6 +359,12 @@ func (m *ChatModel) buildSessionConfig(ctx context.Context, messages []core.Mess
 		})
 	}
 
+	// De-duplicate tools by name, preferring entries with handlers (from bridged tools).
+	sdkTools = deduplicateTools(sdkTools)
+
+	sessionCfg.AvailableTools = toolNames(sdkTools)
+	sessionCfg.ExcludedTools = builtInToolNames()
+
 	if len(sdkTools) > 0 {
 		sessionCfg.Tools = sdkTools
 	}
@@ -342,6 +375,44 @@ func (m *ChatModel) buildSessionConfig(ctx context.Context, messages []core.Mess
 	}
 
 	return sessionCfg
+}
+
+func buildClientOptions(opts *Options) *copilot.ClientOptions {
+	clientOpts := &copilot.ClientOptions{
+		CLIArgs:  defaultCLIArgs(),
+		LogLevel: opts.LogLevel,
+	}
+	if opts.GithubToken != "" {
+		clientOpts.GitHubToken = opts.GithubToken
+	}
+	if opts.CLIPath != "" {
+		clientOpts.CLIPath = opts.CLIPath
+	}
+	return clientOpts
+}
+
+func defaultCLIArgs() []string {
+	return []string{"--disable-builtin-mcps"}
+}
+
+func builtInToolNames() []string {
+	return append([]string(nil), copilotBuiltInToolNames...)
+}
+
+func toolNames(tools []copilot.Tool) []string {
+	names := make([]string, 0, len(tools))
+	seen := make(map[string]struct{}, len(tools))
+	for _, tool := range tools {
+		if tool.Name == "" {
+			continue
+		}
+		if _, ok := seen[tool.Name]; ok {
+			continue
+		}
+		seen[tool.Name] = struct{}{}
+		names = append(names, tool.Name)
+	}
+	return names
 }
 
 // bridgeTools converts langchain Tool implementations to copilot.Tool structs
@@ -393,6 +464,42 @@ func bridgeTools(ctx context.Context, langchainTools []tools.Tool) []copilot.Too
 	}
 
 	return sdkTools
+}
+
+// deduplicateTools removes duplicate tool entries by name, preferring tools with
+// non-nil handlers (which are the bridged tools with executable implementations).
+func deduplicateTools(tools []copilot.Tool) []copilot.Tool {
+	seen := make(map[string]copilot.Tool)
+
+	// First pass: collect all tools by name, prioritizing those with handlers.
+	for _, tool := range tools {
+		if tool.Name == "" {
+			continue
+		}
+		existing, found := seen[tool.Name]
+		// Keep the tool if:
+		// 1. We haven't seen this name yet, OR
+		// 2. The new tool has a handler and the existing one doesn't
+		if !found || (tool.Handler != nil && existing.Handler == nil) {
+			seen[tool.Name] = tool
+		}
+	}
+
+	// Second pass: rebuild the tools slice preserving order of first occurrence.
+	result := make([]copilot.Tool, 0, len(seen))
+	seenOrder := make(map[string]struct{})
+	for _, tool := range tools {
+		if tool.Name == "" {
+			continue
+		}
+		if _, ok := seenOrder[tool.Name]; ok {
+			continue
+		}
+		seenOrder[tool.Name] = struct{}{}
+		result = append(result, seen[tool.Name])
+	}
+
+	return result
 }
 
 // extractSystemMessage finds the first system message content.
