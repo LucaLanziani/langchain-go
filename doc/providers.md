@@ -50,6 +50,60 @@ classDiagram
 
 ---
 
+## Testing With LM Studio
+
+The OpenAI and Anthropic providers include build-tagged integration tests that can be run against a local LM Studio instance.
+
+Run them with:
+
+```bash
+make test-lmstudio-integration
+```
+
+The Make target runs:
+
+```bash
+go test -tags=integration ./providers/anthropic ./providers/openai -run TestLMStudio -v
+```
+
+Makefile defaults:
+
+| Variable              | Default              | Description                               |
+| --------------------- | -------------------- | ----------------------------------------- |
+| `LMSTUDIO_HOST`       | `127.0.0.1`          | Shared host for both provider tests       |
+| `LMSTUDIO_PORT`       | `1234`               | Shared port for both provider tests       |
+| `LMSTUDIO_MODEL`      | `openai/gpt-oss-20b` | Shared model for both provider tests      |
+| `LMSTUDIO_AUTH_TOKEN` | `lmstudio`           | Shared auth token for both provider tests |
+
+Provider-specific overrides:
+
+| Variable                        | Description                                 |
+| ------------------------------- | ------------------------------------------- |
+| `LMSTUDIO_OPENAI_BASE_URL`      | Full OpenAI-compatible base URL override    |
+| `LMSTUDIO_OPENAI_MODEL`         | OpenAI-compatible model override            |
+| `LMSTUDIO_OPENAI_AUTH_TOKEN`    | OpenAI-compatible auth token override       |
+| `LMSTUDIO_ANTHROPIC_BASE_URL`   | Full Anthropic-compatible base URL override |
+| `LMSTUDIO_ANTHROPIC_MODEL`      | Anthropic-compatible model override         |
+| `LMSTUDIO_ANTHROPIC_AUTH_TOKEN` | Anthropic-compatible auth token override    |
+
+The Anthropic-compatible LM Studio endpoint is exposed under `/v1/messages`, so the Anthropic integration test uses `/v1` as its base URL.
+
+Examples:
+
+```bash
+make test-lmstudio-integration LMSTUDIO_HOST=10.0.0.130 LMSTUDIO_PORT=1234
+```
+
+```bash
+make test-lmstudio-integration \
+    LMSTUDIO_HOST=10.0.0.130 \
+    LMSTUDIO_PORT=1234 \
+    LMSTUDIO_MODEL=openai/gpt-oss-20b \
+    LMSTUDIO_AUTH_TOKEN=lmstudio
+```
+
+---
+
 ## OpenAI
 
 **Package:** `github.com/LucaLanziani/langchain-go/providers/openai`
@@ -79,12 +133,12 @@ fmt.Println(resp.Content)
 
 ### Options
 
-| Option | Default | Description |
-|---|---|---|
-| `WithAPIKey(key)` | `$OPENAI_API_KEY` | API key |
-| `WithModelName(model)` | `"gpt-4o"` | Model identifier |
-| `WithBaseURL(url)` | `"https://api.openai.com/v1"` | Base URL (useful for proxies or Azure OpenAI) |
-| `WithOrganization(org)` | — | OpenAI organization ID |
+| Option                  | Default                       | Description                                   |
+| ----------------------- | ----------------------------- | --------------------------------------------- |
+| `WithAPIKey(key)`       | `$OPENAI_API_KEY`             | API key                                       |
+| `WithModelName(model)`  | `"gpt-4o"`                    | Model identifier                              |
+| `WithBaseURL(url)`      | `"https://api.openai.com/v1"` | Base URL (useful for proxies or Azure OpenAI) |
+| `WithOrganization(org)` | —                             | OpenAI organization ID                        |
 
 > Global inference options (`WithTemperature`, `WithMaxTokens`, `WithTopP`) from `llms/options.go` are also accepted by all `Invoke`/`Stream`/`Batch` calls via `core.Option`.
 
@@ -139,12 +193,12 @@ model = anthropic.New(
 
 ### Options
 
-| Option | Default | Description |
-|---|---|---|
-| `WithAPIKey(key)` | `$ANTHROPIC_API_KEY` | API key |
-| `WithModelName(model)` | `"claude-sonnet-4-20250514"` | Model identifier |
-| `WithBaseURL(url)` | `"https://api.anthropic.com/v1"` | Base URL override |
-| `WithMaxTokens(n)` | `4096` | Maximum output tokens (required by Anthropic API) |
+| Option                 | Default                          | Description                                       |
+| ---------------------- | -------------------------------- | ------------------------------------------------- |
+| `WithAPIKey(key)`      | `$ANTHROPIC_API_KEY`             | API key                                           |
+| `WithModelName(model)` | `"claude-sonnet-4-20250514"`     | Model identifier                                  |
+| `WithBaseURL(url)`     | `"https://api.anthropic.com/v1"` | Base URL override                                 |
+| `WithMaxTokens(n)`     | `4096`                           | Maximum output tokens (required by Anthropic API) |
 
 ### System message handling
 
@@ -176,14 +230,14 @@ model, err = copilot.New(
 
 ### Options
 
-| Option | Default | Description |
-|---|---|---|
-| `WithGithubToken(token)` | `$GITHUB_TOKEN` | GitHub personal access token |
-| `WithModelName(model)` | `"gpt-5-mini"` | Model identifier |
-| `WithCLIPath(path)` | `"copilot"` | Path to the Copilot CLI executable |
-| `WithLogLevel(level)` | `"error"` | Log level for the CLI server |
-| `WithMaxConcurrency(n)` | `5` | Maximum parallel sessions in `Batch` |
-| `WithTools(tools...)` | — | Pre-bind tools; the SDK manages the tool-calling loop internally |
+| Option                   | Default         | Description                                                      |
+| ------------------------ | --------------- | ---------------------------------------------------------------- |
+| `WithGithubToken(token)` | `$GITHUB_TOKEN` | GitHub personal access token                                     |
+| `WithModelName(model)`   | `"gpt-5-mini"`  | Model identifier                                                 |
+| `WithCLIPath(path)`      | `"copilot"`     | Path to the Copilot CLI executable                               |
+| `WithLogLevel(level)`    | `"error"`       | Log level for the CLI server                                     |
+| `WithMaxConcurrency(n)`  | `5`             | Maximum parallel sessions in `Batch`                             |
+| `WithTools(tools...)`    | —               | Pre-bind tools; the SDK manages the tool-calling loop internally |
 
 > **Important:** Always call `model.Close()` when done to shut down the underlying CLI server process.
 
