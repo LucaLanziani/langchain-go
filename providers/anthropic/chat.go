@@ -22,6 +22,7 @@ type ChatModel struct {
 	opts             *Options
 	client           *http.Client
 	boundTools       []llms.ToolDefinition
+	boundSkills      []llms.SkillDefinition
 	structuredSchema map[string]any
 	name             string
 }
@@ -53,6 +54,13 @@ func (m *ChatModel) GetName() string {
 func (m *ChatModel) BindTools(tools ...llms.ToolDefinition) llms.ChatModel {
 	cp := *m
 	cp.boundTools = append(append([]llms.ToolDefinition(nil), m.boundTools...), tools...)
+	return &cp
+}
+
+// BindSkills returns a copy of the model with skills bound.
+func (m *ChatModel) BindSkills(skills ...llms.SkillDefinition) llms.ChatModel {
+	cp := *m
+	cp.boundSkills = append(append([]llms.SkillDefinition(nil), m.boundSkills...), skills...)
 	return &cp
 }
 
@@ -227,7 +235,16 @@ func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConf
 		req["tools"] = tools
 	}
 
+	if skills := skillsToRequest(m.boundSkills); len(skills) > 0 {
+		req["skills"] = skills
+	}
+
 	return req, nil
+}
+
+func skillsToRequest(skills []llms.SkillDefinition) []map[string]any {
+	_ = skills
+	return nil
 }
 
 // messageToAPI converts a core.Message to the Anthropic API format.

@@ -59,6 +59,7 @@ type ChatModel struct {
 	opts             *Options
 	client           *copilot.Client
 	boundTools       []llms.ToolDefinition
+	boundSkills      []llms.SkillDefinition
 	structuredSchema map[string]any
 	name             string
 }
@@ -112,6 +113,13 @@ func (m *ChatModel) GetName() string {
 func (m *ChatModel) BindTools(toolDefs ...llms.ToolDefinition) llms.ChatModel {
 	cp := *m
 	cp.boundTools = append(append([]llms.ToolDefinition(nil), m.boundTools...), toolDefs...)
+	return &cp
+}
+
+// BindSkills returns a copy of the model with skills bound.
+func (m *ChatModel) BindSkills(skills ...llms.SkillDefinition) llms.ChatModel {
+	cp := *m
+	cp.boundSkills = append(append([]llms.SkillDefinition(nil), m.boundSkills...), skills...)
 	return &cp
 }
 
@@ -365,12 +373,19 @@ func (m *ChatModel) buildSessionConfig(ctx context.Context, messages []core.Mess
 		sessionCfg.Tools = sdkTools
 	}
 
+	applySkills(sessionCfg, m.boundSkills)
+
 	// Set permission handler if provided.
 	if m.opts.OnPermissionRequest != nil {
 		sessionCfg.OnPermissionRequest = m.opts.OnPermissionRequest
 	}
 
 	return sessionCfg
+}
+
+func applySkills(sessionCfg *copilot.SessionConfig, skills []llms.SkillDefinition) {
+	_ = sessionCfg
+	_ = skills
 }
 
 func buildClientOptions(opts *Options) *copilot.ClientOptions {

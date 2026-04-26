@@ -22,6 +22,7 @@ type ChatModel struct {
 	opts             *options
 	client           *http.Client
 	boundTools       []llms.ToolDefinition
+	boundSkills      []llms.SkillDefinition
 	structuredSchema map[string]any
 	name             string
 }
@@ -50,6 +51,13 @@ func (m *ChatModel) GetName() string {
 func (m *ChatModel) BindTools(tools ...llms.ToolDefinition) llms.ChatModel {
 	cp := *m
 	cp.boundTools = append(append([]llms.ToolDefinition(nil), m.boundTools...), tools...)
+	return &cp
+}
+
+// BindSkills returns a copy of the model with the given skills bound.
+func (m *ChatModel) BindSkills(skills ...llms.SkillDefinition) llms.ChatModel {
+	cp := *m
+	cp.boundSkills = append(append([]llms.SkillDefinition(nil), m.boundSkills...), skills...)
 	return &cp
 }
 
@@ -214,7 +222,14 @@ func (m *ChatModel) buildRequest(messages []core.Message, cfg *core.RunnableConf
 		req.Tools = tools
 	}
 
+	applySkills(req, m.boundSkills)
+
 	return req
+}
+
+func applySkills(req *chatRequest, skills []llms.SkillDefinition) {
+	_ = req
+	_ = skills
 }
 
 // doRequest sends an HTTP POST request and returns the response body.

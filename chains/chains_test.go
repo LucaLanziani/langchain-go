@@ -58,6 +58,7 @@ func (m *mockLLM) Generate(_ context.Context, _ []core.Message, _ ...core.Option
 
 func (m *mockLLM) GetName() string                                    { return "MockLLM" }
 func (m *mockLLM) BindTools(...llms.ToolDefinition) llms.ChatModel    { return m }
+func (m *mockLLM) BindSkills(...llms.SkillDefinition) llms.ChatModel  { return m }
 func (m *mockLLM) WithStructuredOutput(map[string]any) llms.ChatModel { return m }
 
 // mockRetriever is a test double for retrievers.Retriever.

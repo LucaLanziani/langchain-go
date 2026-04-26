@@ -76,6 +76,10 @@ func (m *mockLLMForRouting) BindTools(...llms.ToolDefinition) llms.ChatModel {
 	return m
 }
 
+func (m *mockLLMForRouting) BindSkills(...llms.SkillDefinition) llms.ChatModel {
+	return m
+}
+
 func (m *mockLLMForRouting) WithStructuredOutput(map[string]any) llms.ChatModel {
 	return m
 }
@@ -125,6 +129,10 @@ func (m *mockProviderForRouting) GetName() string {
 }
 
 func (m *mockProviderForRouting) BindTools(...llms.ToolDefinition) llms.ChatModel {
+	return m
+}
+
+func (m *mockProviderForRouting) BindSkills(...llms.SkillDefinition) llms.ChatModel {
 	return m
 }
 

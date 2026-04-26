@@ -14,10 +14,14 @@ type ChatModel interface {
     core.Runnable[[]core.Message, *core.AIMessage]
 
     // Generate is the lower-level batched inference call.
-    Generate(ctx context.Context, messageSets [][]core.Message, opts ...core.Option) (*ChatResult, error)
+    Generate(ctx context.Context, messages []core.Message, opts ...core.Option) (*ChatResult, error)
 
     // BindTools returns a new ChatModel that will always send tool definitions.
     BindTools(tools ...ToolDefinition) ChatModel
+
+    // BindSkills returns a new ChatModel that will always send skill definitions
+    // when the provider supports native skills.
+    BindSkills(skills ...SkillDefinition) ChatModel
 
     // WithStructuredOutput returns a ChatModel configured for structured JSON output.
     WithStructuredOutput(schema map[string]any) ChatModel
@@ -33,8 +37,9 @@ classDiagram
         +Invoke(ctx, []Message, ...Option) (*AIMessage, error)
         +Stream(ctx, []Message, ...Option) (*StreamIterator[AIMessage], error)
         +Batch(ctx, [][]Message, ...Option) ([]*AIMessage, error)
-        +Generate(ctx, [][]Message, ...Option) (*ChatResult, error)
+        +Generate(ctx, []Message, ...Option) (*ChatResult, error)
         +BindTools(...ToolDefinition) ChatModel
+        +BindSkills(...SkillDefinition) ChatModel
         +WithStructuredOutput(schema) ChatModel
         +GetName() string
     }
@@ -227,6 +232,35 @@ type ToolDefinition struct {
     Parameters  map[string]any `json:"parameters"` // JSON Schema
 }
 ```
+
+### `SkillDefinition`
+
+```go
+// llms/chatmodel.go
+type SkillDefinition struct {
+    Name         string         `json:"name"`
+    Description  string         `json:"description"`
+    Instructions string         `json:"instructions"`
+    Parameters   map[string]any `json:"parameters"` // Optional JSON Schema
+}
+```
+
+## Skills
+
+Models and routers can also bind provider-native skills:
+
+```go
+reviewSkill := llms.SkillDefinition{
+    Name:         "review",
+    Description:  "Review code changes for regressions.",
+    Instructions: "Prioritize correctness, behavioral regressions, and missing tests.",
+}
+
+model = model.BindSkills(reviewSkill)
+router.BindSkills(reviewSkill)
+```
+
+Binding skills is provider-dependent in the current release. Supported providers preserve and propagate the bound definitions, but providers without a concrete native mapping ignore them silently instead of failing or emulating skills through prompt injection.
 
 ---
 

@@ -50,6 +50,10 @@ func (m *mockProvider) BindTools(tools ...llms.ToolDefinition) llms.ChatModel {
 	return m
 }
 
+func (m *mockProvider) BindSkills(skills ...llms.SkillDefinition) llms.ChatModel {
+	return m
+}
+
 func (m *mockProvider) WithStructuredOutput(schema map[string]any) llms.ChatModel {
 	return m
 }

@@ -457,6 +457,21 @@ func TestBindToolsDoesNotAliasDerivedModels(t *testing.T) {
 	}
 }
 
+func TestBindSkillsDoesNotAliasDerivedModels(t *testing.T) {
+	m := &ChatModel{opts: defaultOptions(), boundSkills: make([]llms.SkillDefinition, 1, 4)}
+	m.boundSkills[0] = llms.SkillDefinition{Name: "base"}
+
+	left := m.BindSkills(llms.SkillDefinition{Name: "left"}).(*ChatModel)
+	right := m.BindSkills(llms.SkillDefinition{Name: "right"}).(*ChatModel)
+
+	if left.boundSkills[1].Name != "left" {
+		t.Fatalf("expected left skill to remain isolated, got %q", left.boundSkills[1].Name)
+	}
+	if right.boundSkills[1].Name != "right" {
+		t.Fatalf("expected right skill to remain isolated, got %q", right.boundSkills[1].Name)
+	}
+}
+
 // ---------- ChatModel.WithStructuredOutput ----------
 
 func TestWithStructuredOutput(t *testing.T) {
