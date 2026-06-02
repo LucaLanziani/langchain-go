@@ -19,7 +19,7 @@ Its goals are:
 
 | #   | Original finding                                                      | Status | Resolution                                                                                                                                                                                            |
 | --- | --------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Provider copy helpers alias mutable state                             | Fixed  | `providers/openai`, `providers/anthropic`, `providers/github-copilot`, and `providers/ollama` now deep-copy bound tools and structured-output schema state instead of sharing mutable slices or maps. |
+| 1   | Provider copy helpers alias mutable state                             | Fixed  | `providers/openai`, `providers/anthropic`, and `providers/github-copilot` now deep-copy bound tools and structured-output schema state instead of sharing mutable slices or maps. |
 | 2   | `Batch` semantics do not match the documented contract                | Fixed  | Added shared `core.Batch`, migrated library implementations to it, aligned `Runnable.Batch` docs, and honored `core.WithMaxConcurrency` consistently.                                                 |
 | 3   | Tool-calling agent scratchpad reuses tool call IDs                    | Fixed  | `agents.ToolCallingAgent` now preserves provider-issued tool call IDs and generates unique fallback IDs when rebuilding the scratchpad.                                                               |
 | 4   | Router stream metrics only measure stream startup                     | Fixed  | Router stream metrics now update at terminal stream completion and distinguish success, error, and cancellation with end-to-end latency.                                                              |
@@ -116,12 +116,6 @@ Its goals are:
 - Addressed: runtime `core.WithMaxConcurrency` now takes precedence for batch execution.
 - Partially constrained by environment: coverage is still more limited than fully local providers because live integration behavior remains environment-dependent, but clone-regression tests were added.
 
-### providers/ollama
-
-- Addressed: structured-output schema aliasing is removed.
-- Addressed: batch execution now uses the shared helper.
-- Retained tradeoff: startup validation remains intentionally request-time rather than eagerly probing the server.
-
 ## Validation
 
 The remediation set was validated with:
@@ -140,7 +134,6 @@ The original review mixed correctness bugs with longer-horizon product tradeoffs
 - output-parser schema-aware validation beyond Go unmarshalling,
 - callback panic isolation policy,
 - in-memory vector-store scaling characteristics,
-- `AgentExecutor` parsing-error retry policy, and
-- Ollama startup validation strategy.
+- `AgentExecutor` parsing-error retry policy.
 
 Those items were not skipped; they are explicitly retained as future design decisions rather than unresolved regressions.

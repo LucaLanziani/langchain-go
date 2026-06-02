@@ -40,11 +40,12 @@ func main() {
 				},
 			},
 			{
-				Name:         "local-ollama",
-				ProviderType: provider.ProviderOllama,
+				Name:         "local-lmstudio",
+				ProviderType: provider.ProviderOpenAI,
 				Options: []provider.ProviderOption{
-					provider.WithModel("llama3.2"),
-					provider.WithBaseURL("http://localhost:11434"),
+					provider.WithModel("qwen2.5-7b-instruct"),
+					provider.WithBaseURL("http://localhost:1234/v1"),
+					provider.WithAPIKey("lm-studio"),
 				},
 			},
 		},
@@ -59,7 +60,7 @@ func main() {
 	fmt.Println("Router created with 3 providers:")
 	fmt.Println("  - fast-openai (gpt-4o-mini)")
 	fmt.Println("  - smart-anthropic (claude-3-5-haiku)")
-	fmt.Println("  - local-ollama (llama3.2)")
+	fmt.Println("  - local-lmstudio (qwen2.5-7b-instruct via LM Studio)")
 	fmt.Println("\nUsing SimpleStrategy to always route to 'fast-openai'")
 
 	// Make several requests - all will go to fast-openai

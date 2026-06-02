@@ -5,7 +5,7 @@ with intelligent routing, fallback strategies, and metrics tracking.
 # Overview
 
 The provider package provides a consistent way to create and configure any of the supported
-LLM providers (Anthropic, GitHub Copilot, Ollama, OpenAI) while maintaining backward compatibility
+LLM providers (Anthropic, GitHub Copilot, OpenAI) while maintaining backward compatibility
 and supporting all provider-specific features. It also includes a Router component for managing
 multiple providers with configurable routing and fallback strategies.
 
@@ -13,7 +13,6 @@ multiple providers with configurable routing and fallback strategies.
 
   - Anthropic (Claude models)
   - GitHub Copilot
-  - Ollama (local models)
   - OpenAI (GPT models)
 
 # Single Provider Usage
@@ -58,13 +57,6 @@ Provider-specific options are set using WithProviderSpecific:
 		provider.WithModel("gpt-4o"),
 		provider.WithProviderSpecific("tools", []tools.Tool{myTool}),
 		provider.WithProviderSpecific("cli_path", "/usr/local/bin/github-copilot-cli"),
-	)
-
-	// Ollama with custom options
-	model, cleanup, err := provider.NewProvider(ctx, provider.ProviderOllama,
-		provider.WithModel("llama2"),
-		provider.WithProviderSpecific("keep_alive", "5m"),
-		provider.WithProviderSpecific("num_ctx", 4096),
 	)
 
 # Multi-Provider Router
@@ -199,7 +191,7 @@ When a provider fails, the router can automatically try alternative providers:
 2. SequentialFallback - Tries providers in order:
 
 	provider.WithFallback(&provider.SequentialFallback{
-		Order: []string{"fast-gpt", "smart-claude", "local-ollama"},
+		Order: []string{"fast-gpt", "smart-claude", "backup-gpt"},
 	})
 
 3. SmartFallback - Selects fallback based on success rate:
@@ -264,8 +256,6 @@ The package supports multiple authentication methods:
 3. GitHub CLI (for Copilot):
 
 	gh auth token
-
-Ollama doesn't require authentication.
 
 # Resource Cleanup
 
@@ -386,7 +376,11 @@ The package maintains full backward compatibility with existing provider-specifi
 	// Still works
 	model := anthropic.New(anthropic.WithModelName("claude-3-opus-20240229"))
 	model := openai.New(openai.WithModelName("gpt-4o"))
-	model := ollama.New(ollama.WithModel("llama2"))
+	model := openai.New(
+		openai.WithModelName("qwen2.5-7b-instruct"),
+		openai.WithBaseURL("http://localhost:1234/v1"),
+		openai.WithAPIKey("lm-studio"),
+	)
 	model, _ := copilot.New(ctx, copilot.WithModelName("gpt-4o"))
 
 The unified interface is an addition, not a replacement.

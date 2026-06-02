@@ -10,7 +10,7 @@ import (
 )
 
 // Example 1: Single Provider Creation
-// Demonstrates creating individual providers (OpenAI, Anthropic, Ollama, Copilot)
+// Demonstrates creating individual providers (OpenAI, Anthropic, LM Studio, Copilot)
 // using the unified provider interface.
 
 func main() {
@@ -62,26 +62,27 @@ func main() {
 		}
 	}
 
-	// Example 1c: Create Ollama provider (local)
-	fmt.Println("=== Creating Ollama Provider ===")
-	ollamaModel, ollamaCleanup, err := provider.NewProvider(
+	// Example 1c: Create LM Studio provider (local via OpenAI-compatible endpoint)
+	fmt.Println("=== Creating LM Studio Provider ===")
+	lmStudioModel, lmStudioCleanup, err := provider.NewProvider(
 		ctx,
-		provider.ProviderOllama,
-		provider.WithModel("llama3.2"),
-		provider.WithBaseURL("http://localhost:11434"),
+		provider.ProviderOpenAI,
+		provider.WithModel("qwen2.5-7b-instruct"),
+		provider.WithBaseURL("http://localhost:1234/v1"),
+		provider.WithAPIKey("lm-studio"),
 		provider.WithTemperature(0.7),
 	)
 	if err != nil {
-		log.Printf("Failed to create Ollama provider: %v\n", err)
+		log.Printf("Failed to create LM Studio provider: %v\n", err)
 	} else {
-		defer ollamaCleanup()
-		response, err := ollamaModel.Invoke(ctx, []core.Message{
+		defer lmStudioCleanup()
+		response, err := lmStudioModel.Invoke(ctx, []core.Message{
 			core.NewHumanMessage("Say hello in one sentence"),
 		})
 		if err != nil {
-			log.Printf("Ollama invoke failed: %v\n", err)
+			log.Printf("LM Studio invoke failed: %v\n", err)
 		} else {
-			fmt.Printf("Ollama Response: %s\n\n", response.GetContent())
+			fmt.Printf("LM Studio Response: %s\n\n", response.GetContent())
 		}
 	}
 

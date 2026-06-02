@@ -44,14 +44,12 @@ Affected files:
 - [providers/openai/chat.go](../providers/openai/chat.go#L43-L55)
 - [providers/anthropic/chat.go](../providers/anthropic/chat.go#L44-L56)
 - [providers/github-copilot/chat.go](../providers/github-copilot/chat.go#L79-L91)
-- [providers/ollama/chat.go](../providers/ollama/chat.go#L42-L54)
 
 Why it matters:
 
 - `BindTools` in OpenAI, Anthropic, and GitHub Copilot copies the struct with `cp := *m` and then appends to `cp.boundTools`. That reuses the original slice backing array when capacity permits.
 - The result is not immediate corruption of the original model value, but it does allow different derived copies to mutate each other indirectly when they share the same backing array.
 - `WithStructuredOutput` across providers stores a caller-owned schema map directly, so later mutation of the schema map can change provider behavior unexpectedly.
-- Ollama already deep-copies `boundTools`, which is the safer pattern and shows the intended fix.
 
 Recommended fix:
 
@@ -77,7 +75,6 @@ Affected docs and representative implementations:
 - [agents/executor.go](../agents/executor.go#L205-L214)
 - [providers/openai/chat.go](../providers/openai/chat.go#L126-L137)
 - [providers/anthropic/chat.go](../providers/anthropic/chat.go#L128-L139)
-- [providers/ollama/chat.go](../providers/ollama/chat.go#L125-L136)
 - [retrievers/retriever.go](../retrievers/retriever.go#L78-L87)
 
 Why it matters:
@@ -202,7 +199,7 @@ Why it matters:
 
 Recommended fix:
 
-- Mirror the Ollama implementation and emit a terminal error chunk when `scanner.Err()` is non-nil.
+- Emit a terminal error chunk when `scanner.Err()` is non-nil.
 
 Recommended tests:
 
@@ -563,17 +560,6 @@ Concerns:
 
 - Copy helpers alias state.
 - Automated coverage is limited because most tests are environment-dependent.
-
-### providers/ollama
-
-Strengths:
-
-- Best `BindTools` implementation among the providers because it deep-copies the bound tool slice.
-
-Concerns:
-
-- `WithStructuredOutput` still aliases the schema map.
-- Startup validation remains intentionally light, so many errors are deferred to first request.
 
 ## Check Results
 

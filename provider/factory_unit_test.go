@@ -246,96 +246,6 @@ func TestNewProvider_OpenAI(t *testing.T) {
 	})
 }
 
-// TestNewProvider_Ollama tests Ollama provider creation with various configurations
-func TestNewProvider_Ollama(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("creates Ollama provider with minimal config", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-		if cleanup == nil {
-			t.Fatal("Expected non-nil cleanup function")
-		}
-
-		var _ llms.ChatModel = model
-		cleanup()
-	})
-
-	t.Run("creates Ollama provider with custom base URL", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-			WithBaseURL("http://custom:11434"),
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-
-		cleanup()
-	})
-
-	t.Run("creates Ollama provider with all common options", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-			WithBaseURL("http://localhost:11434"),
-			WithTemperature(0.7),
-			WithMaxTokens(2000),
-			WithTopP(0.9),
-			WithStop([]string{"stop1", "stop2"}),
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-
-		cleanup()
-	})
-
-	t.Run("creates Ollama provider without authentication", func(t *testing.T) {
-		// Ollama doesn't require authentication
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-
-		cleanup()
-	})
-
-	t.Run("fails without model name", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama)
-
-		if err == nil {
-			t.Error("Expected error for missing model name")
-		}
-		if model != nil {
-			t.Error("Expected nil model on error")
-		}
-		if cleanup != nil {
-			t.Error("Expected nil cleanup on error")
-		}
-	})
-}
-
 // TestNewProvider_Copilot tests GitHub Copilot provider creation with various configurations
 func TestNewProvider_Copilot(t *testing.T) {
 	ctx := context.Background()
@@ -496,25 +406,6 @@ func TestCleanupFunction(t *testing.T) {
 		}
 	})
 
-	t.Run("cleanup is idempotent for Ollama", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-		)
-		if err != nil {
-			t.Fatalf("Failed to create provider: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-
-		// Call cleanup multiple times
-		for i := 0; i < 5; i++ {
-			if err := cleanup(); err != nil {
-				t.Errorf("Cleanup call %d returned error: %v", i+1, err)
-			}
-		}
-	})
-
 	t.Run("cleanup returns non-nil function on success", func(t *testing.T) {
 		providers := []struct {
 			name         string
@@ -536,13 +427,6 @@ func TestCleanupFunction(t *testing.T) {
 				options: []ProviderOption{
 					WithModel("gpt-4o"),
 					WithAPIKey("test-api-key"),
-				},
-			},
-			{
-				name:         "Ollama",
-				providerType: ProviderOllama,
-				options: []ProviderOption{
-					WithModel("llama3.1"),
 				},
 			},
 		}
@@ -573,89 +457,6 @@ func TestProviderSpecificOptions(t *testing.T) {
 			WithModel("gpt-4o"),
 			WithAPIKey("test-api-key"),
 			WithProviderSpecific("organization", "org-123"),
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-
-		cleanup()
-	})
-
-	t.Run("Ollama with keep_alive option", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-			WithProviderSpecific("keep_alive", "5m"),
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-
-		cleanup()
-	})
-
-	t.Run("Ollama with format option", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-			WithProviderSpecific("format", "json"),
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-
-		cleanup()
-	})
-
-	t.Run("Ollama with num_ctx option", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-			WithProviderSpecific("num_ctx", 4096),
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-
-		cleanup()
-	})
-
-	t.Run("Ollama with top_k option", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-			WithProviderSpecific("top_k", 40),
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got: %v", err)
-		}
-		if model == nil {
-			t.Fatal("Expected non-nil model")
-		}
-
-		cleanup()
-	})
-
-	t.Run("Ollama with multiple provider-specific options", func(t *testing.T) {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama,
-			WithModel("llama3.1"),
-			WithProviderSpecific("keep_alive", "5m"),
-			WithProviderSpecific("format", "json"),
-			WithProviderSpecific("num_ctx", 4096),
-			WithProviderSpecific("top_k", 40),
 		)
 
 		if err != nil {
@@ -906,7 +707,6 @@ func TestAllProviderTypes(t *testing.T) {
 	providerTypes := []ProviderType{
 		ProviderAnthropic,
 		ProviderGitHubCopilot,
-		ProviderOllama,
 		ProviderOpenAI,
 	}
 
@@ -931,10 +731,6 @@ func TestAllProviderTypes(t *testing.T) {
 				options = []ProviderOption{
 					WithModel("gpt-4o"),
 					WithAPIKey("test-key"),
-				}
-			case ProviderOllama:
-				options = []ProviderOption{
-					WithModel("llama3.1"),
 				}
 			case ProviderGitHubCopilot:
 				options = []ProviderOption{

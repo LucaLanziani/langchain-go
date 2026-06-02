@@ -6,7 +6,6 @@ import (
 
 	"github.com/LucaLanziani/langchain-go/providers/anthropic"
 	copilot "github.com/LucaLanziani/langchain-go/providers/github-copilot"
-	"github.com/LucaLanziani/langchain-go/providers/ollama"
 	"github.com/LucaLanziani/langchain-go/providers/openai"
 )
 
@@ -53,27 +52,6 @@ func TestBackwardCompatibility_OpenAINew(t *testing.T) {
 	}
 
 	t.Logf("Successfully created OpenAI model: %s", name)
-}
-
-// TestBackwardCompatibility_OllamaNew verifies that ollama.New() still works.
-func TestBackwardCompatibility_OllamaNew(t *testing.T) {
-	// Create provider using existing constructor
-	model := ollama.New(
-		ollama.WithModel("llama2"),
-		ollama.WithBaseURL("http://localhost:11434"),
-	)
-
-	if model == nil {
-		t.Fatal("ollama.New() returned nil")
-	}
-
-	// Verify it implements the ChatModel interface
-	name := model.GetName()
-	if name == "" {
-		t.Error("GetName() returned empty string")
-	}
-
-	t.Logf("Successfully created Ollama model: %s", name)
 }
 
 // TestBackwardCompatibility_CopilotNew verifies that copilot.New() still works.
@@ -143,29 +121,6 @@ func TestBackwardCompatibility_OpenAIOptions(t *testing.T) {
 	t.Log("All OpenAI option functions work correctly")
 }
 
-// TestBackwardCompatibility_OllamaOptions verifies that all Ollama option functions still work.
-func TestBackwardCompatibility_OllamaOptions(t *testing.T) {
-	// Test all common option functions
-	model := ollama.New(
-		ollama.WithModel("llama2"),
-		ollama.WithBaseURL("http://localhost:11434"),
-		ollama.WithTemperature(0.7),
-		ollama.WithTopP(0.9),
-		ollama.WithNumPredict(512),
-		ollama.WithNumCtx(2048),
-		ollama.WithTopK(40),
-		ollama.WithStop([]string{"stop1", "stop2"}),
-		ollama.WithKeepAlive("5m"),
-		ollama.WithFormat("json"),
-	)
-
-	if model == nil {
-		t.Fatal("Failed to create Ollama model with options")
-	}
-
-	t.Log("All Ollama option functions work correctly")
-}
-
 // TestBackwardCompatibility_CopilotOptions verifies that all Copilot option functions still work.
 func TestBackwardCompatibility_CopilotOptions(t *testing.T) {
 	ctx := context.Background()
@@ -198,7 +153,6 @@ func TestBackwardCompatibility_InterfaceCompatibility(t *testing.T) {
 	}{
 		{"Anthropic", "anthropic"},
 		{"OpenAI", "openai"},
-		{"Ollama", "ollama"},
 		{"Copilot", "copilot"},
 	}
 
@@ -217,10 +171,6 @@ func TestBackwardCompatibility_InterfaceCompatibility(t *testing.T) {
 				model = openai.New(
 					openai.WithAPIKey("test-key"),
 					openai.WithModelName("gpt-4"),
-				)
-			case "ollama":
-				model = ollama.New(
-					ollama.WithModel("llama2"),
 				)
 			case "copilot":
 				// Copilot requires context and may fail without credentials

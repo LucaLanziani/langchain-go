@@ -9,7 +9,6 @@ import (
 	"github.com/LucaLanziani/langchain-go/llms"
 	"github.com/LucaLanziani/langchain-go/providers/anthropic"
 	copilot "github.com/LucaLanziani/langchain-go/providers/github-copilot"
-	"github.com/LucaLanziani/langchain-go/providers/ollama"
 	"github.com/LucaLanziani/langchain-go/providers/openai"
 	"github.com/LucaLanziani/langchain-go/tools"
 )
@@ -18,7 +17,7 @@ import (
 // Returns the created model, a cleanup function, and an error if creation fails.
 //
 // The cleanup function must be called when the model is no longer needed to release resources.
-// For most providers (Anthropic, OpenAI, Ollama), cleanup is a no-op. For GitHub Copilot,
+// For most providers (Anthropic, OpenAI), cleanup is a no-op. For GitHub Copilot,
 // cleanup stops the CLI server process.
 //
 // Example:
@@ -50,8 +49,6 @@ func NewProvider(ctx context.Context, providerType ProviderType, opts ...Provide
 		return createAnthropic(config)
 	case ProviderGitHubCopilot:
 		return createCopilot(ctx, config)
-	case ProviderOllama:
-		return createOllama(config)
 	case ProviderOpenAI:
 		return createOpenAI(config)
 	default:
@@ -148,65 +145,6 @@ func createCopilot(ctx context.Context, config *ProviderConfig) (llms.ChatModel,
 	cleanup := func() error {
 		return model.Close()
 	}
-
-	return model, cleanup, nil
-}
-
-// createOllama creates an Ollama ChatModel from unified configuration
-func createOllama(config *ProviderConfig) (llms.ChatModel, CleanupFunc, error) {
-	opts := []ollama.OptionFunc{}
-
-	// Model
-	if config.Model != "" {
-		opts = append(opts, ollama.WithModel(config.Model))
-	}
-
-	// Base URL
-	if config.BaseURL != "" {
-		opts = append(opts, ollama.WithBaseURL(config.BaseURL))
-	}
-
-	// Temperature
-	if config.Temperature != nil {
-		opts = append(opts, ollama.WithTemperature(*config.Temperature))
-	}
-
-	// TopP
-	if config.TopP != nil {
-		opts = append(opts, ollama.WithTopP(*config.TopP))
-	}
-
-	// MaxTokens (maps to NumPredict in Ollama)
-	if config.MaxTokens != nil {
-		opts = append(opts, ollama.WithNumPredict(*config.MaxTokens))
-	}
-
-	// Stop sequences
-	if len(config.Stop) > 0 {
-		opts = append(opts, ollama.WithStop(config.Stop))
-	}
-
-	// Provider-specific options
-	if keepAlive, ok := config.ProviderSpecific["keep_alive"].(string); ok {
-		opts = append(opts, ollama.WithKeepAlive(keepAlive))
-	}
-
-	if format, ok := config.ProviderSpecific["format"].(string); ok {
-		opts = append(opts, ollama.WithFormat(format))
-	}
-
-	if numCtx, ok := config.ProviderSpecific["num_ctx"].(int); ok {
-		opts = append(opts, ollama.WithNumCtx(numCtx))
-	}
-
-	if topK, ok := config.ProviderSpecific["top_k"].(int); ok {
-		opts = append(opts, ollama.WithTopK(topK))
-	}
-
-	model := ollama.New(opts...)
-
-	// Ollama doesn't need cleanup
-	cleanup := func() error { return nil }
 
 	return model, cleanup, nil
 }

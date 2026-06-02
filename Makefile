@@ -1,10 +1,21 @@
-.PHONY: help build test fmt vet lint clean run release
+.PHONY: help build test test-lmstudio-integration fmt vet lint clean run release
+
+LMSTUDIO_HOST ?= 127.0.0.1
+LMSTUDIO_PORT ?= 1234
+LMSTUDIO_MODEL ?= openai/gpt-oss-20b
+LMSTUDIO_AUTH_TOKEN ?= lmstudio
+
+export LMSTUDIO_HOST LMSTUDIO_PORT LMSTUDIO_MODEL LMSTUDIO_AUTH_TOKEN
+export LMSTUDIO_OPENAI_BASE_URL LMSTUDIO_OPENAI_MODEL LMSTUDIO_OPENAI_AUTH_TOKEN
+export LMSTUDIO_ANTHROPIC_BASE_URL LMSTUDIO_ANTHROPIC_MODEL LMSTUDIO_ANTHROPIC_AUTH_TOKEN
 
 # Default target
 help:
 	@echo "Available targets:"
 	@echo "  make build    - Build the project"
 	@echo "  make test     - Run tests"
+	@echo "  make test-lmstudio-integration - Run LM Studio provider integration tests"
+	@echo "    overrides: LMSTUDIO_HOST, LMSTUDIO_PORT, LMSTUDIO_MODEL, LMSTUDIO_AUTH_TOKEN"
 	@echo "  make fmt      - Format code with gofmt"
 	@echo "  make vet      - Run go vet"
 	@echo "  make lint     - Run golangci-lint (if installed)"
@@ -19,6 +30,10 @@ build:
 # Run tests
 test:
 	go test -v -race ./...
+
+# Run LM Studio provider integration tests
+test-lmstudio-integration:
+	go test -tags=integration ./providers/anthropic ./providers/openai -run TestLMStudio -v
 
 # Format code
 fmt:

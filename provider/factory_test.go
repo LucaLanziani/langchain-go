@@ -104,37 +104,6 @@ func TestProperty1_ProviderCreationConsistency(t *testing.T) {
 			},
 			shouldSucceed: false,
 		},
-		{
-			name:         "Ollama with valid config",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-			},
-			shouldSucceed: true,
-		},
-		{
-			name:         "Ollama with custom base URL",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-				WithBaseURL("http://custom:11434"),
-			},
-			shouldSucceed: true,
-		},
-		{
-			name:         "Ollama with all options",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-				WithTemperature(0.7),
-				WithMaxTokens(2000),
-				WithTopP(0.9),
-				WithStop([]string{"stop1", "stop2"}),
-				WithProviderSpecific("keep_alive", "5m"),
-				WithProviderSpecific("format", "json"),
-			},
-			shouldSucceed: true,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -331,7 +300,6 @@ func TestProperty1_QuickCheck(t *testing.T) {
 	providerTypes := []ProviderType{
 		ProviderAnthropic,
 		ProviderOpenAI,
-		ProviderOllama,
 	}
 
 	for _, providerType := range providerTypes {
@@ -393,13 +361,6 @@ func TestProperty1_CleanupIdempotency(t *testing.T) {
 				WithAPIKey("test-key"),
 			},
 		},
-		{
-			name:         "Ollama",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-			},
-		},
 	}
 
 	for _, tc := range testCases {
@@ -455,27 +416,6 @@ func TestProperty2_CleanupSafety(t *testing.T) {
 			options: []ProviderOption{
 				WithModel("gpt-4o"),
 				WithAPIKey("test-key"),
-			},
-		},
-		{
-			name:         "Ollama cleanup safety",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-			},
-		},
-		{
-			name:         "Ollama with all options cleanup safety",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-				WithBaseURL("http://localhost:11434"),
-				WithTemperature(0.7),
-				WithMaxTokens(2000),
-				WithTopP(0.9),
-				WithStop([]string{"stop1", "stop2"}),
-				WithProviderSpecific("keep_alive", "5m"),
-				WithProviderSpecific("format", "json"),
 			},
 		},
 	}
@@ -556,13 +496,6 @@ func TestProperty2_CleanupSafety_ConcurrentCalls(t *testing.T) {
 				WithAPIKey("test-key"),
 			},
 		},
-		{
-			name:         "Ollama concurrent cleanup",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-			},
-		},
 	}
 
 	for _, tc := range testCases {
@@ -632,13 +565,6 @@ func TestProperty2_CleanupSafety_NilCleanup(t *testing.T) {
 				WithAPIKey("test-key"),
 			},
 		},
-		{
-			name:         "Ollama returns non-nil cleanup",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-			},
-		},
 	}
 
 	for _, tc := range testCases {
@@ -666,7 +592,6 @@ func TestProperty2_CleanupSafety_QuickCheck(t *testing.T) {
 	providerTypes := []ProviderType{
 		ProviderAnthropic,
 		ProviderOpenAI,
-		ProviderOllama,
 	}
 
 	for _, providerType := range providerTypes {
@@ -745,29 +670,6 @@ func TestProperty3_InterfaceCompatibility(t *testing.T) {
 			},
 		},
 		{
-			name:         "Ollama implements ChatModel",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-			},
-		},
-		{
-			name:         "Ollama with all options implements ChatModel",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-				WithBaseURL("http://localhost:11434"),
-				WithTemperature(0.7),
-				WithMaxTokens(2000),
-				WithTopP(0.9),
-				WithStop([]string{"stop1", "stop2"}),
-				WithProviderSpecific("keep_alive", "5m"),
-				WithProviderSpecific("format", "json"),
-				WithProviderSpecific("num_ctx", 4096),
-				WithProviderSpecific("top_k", 40),
-			},
-		},
-		{
 			name:         "Anthropic with all options implements ChatModel",
 			providerType: ProviderAnthropic,
 			options: []ProviderOption{
@@ -835,7 +737,6 @@ func TestProperty3_InterfaceCompatibility_AllProviders(t *testing.T) {
 	providerTypes := []ProviderType{
 		ProviderAnthropic,
 		ProviderOpenAI,
-		ProviderOllama,
 		// Note: ProviderGitHubCopilot requires actual CLI setup, so we skip it in this test
 	}
 
@@ -871,7 +772,6 @@ func TestProperty3_InterfaceCompatibility_QuickCheck(t *testing.T) {
 	providerTypes := []ProviderType{
 		ProviderAnthropic,
 		ProviderOpenAI,
-		ProviderOllama,
 	}
 
 	for _, providerType := range providerTypes {
@@ -932,13 +832,6 @@ func TestProperty3_InterfaceCompatibility_MethodsExist(t *testing.T) {
 				WithAPIKey("test-key"),
 			},
 		},
-		{
-			name:         "Ollama has all methods",
-			providerType: ProviderOllama,
-			options: []ProviderOption{
-				WithModel("llama3.1"),
-			},
-		},
 	}
 
 	for _, tc := range testCases {
@@ -988,8 +881,6 @@ func generateValidConfig(seed int64, providerType ProviderType) []ProviderOption
 		options = append(options,
 			WithAPIKey("test-key"),
 		)
-	case ProviderOllama:
-		// Ollama doesn't require auth
 	}
 
 	// Add some optional parameters based on seed

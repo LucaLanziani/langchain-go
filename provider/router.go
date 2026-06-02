@@ -675,6 +675,23 @@ func (r *Router) BindTools(tools ...llms.ToolDefinition) llms.ChatModel {
 	return r
 }
 
+// BindSkills implements the llms.ChatModel interface.
+// It binds skills to all providers managed by the router.
+func (r *Router) BindSkills(skills ...llms.SkillDefinition) llms.ChatModel {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.providers == nil {
+		return r
+	}
+
+	for name, provider := range r.providers {
+		r.providers[name] = provider.BindSkills(skills...)
+	}
+
+	return r
+}
+
 // WithStructuredOutput implements the llms.ChatModel interface.
 // It configures structured output for all providers managed by the router.
 func (r *Router) WithStructuredOutput(schema map[string]any) llms.ChatModel {

@@ -43,11 +43,12 @@ func main() {
 				},
 			},
 			{
-				Name:         "ollama-local",
-				ProviderType: provider.ProviderOllama,
+				Name:         "lmstudio-local",
+				ProviderType: provider.ProviderOpenAI,
 				Options: []provider.ProviderOption{
-					provider.WithModel("llama3.2"),
-					provider.WithBaseURL("http://localhost:11434"),
+					provider.WithModel("qwen2.5-7b-instruct"),
+					provider.WithBaseURL("http://localhost:1234/v1"),
+					provider.WithAPIKey("lm-studio"),
 				},
 			},
 		},
@@ -70,7 +71,7 @@ func main() {
 	fmt.Println("Router created with custom routing logic:")
 	fmt.Println("  - Creative tasks → openai-creative (high temperature)")
 	fmt.Println("  - Analytical tasks → anthropic-analytical (low temperature)")
-	fmt.Println("  - Privacy-sensitive → ollama-local")
+	fmt.Println("  - Privacy-sensitive → lmstudio-local")
 	fmt.Println("  - Code-related → anthropic-analytical")
 	fmt.Println()
 
@@ -152,8 +153,8 @@ func customRoutingLogic(ctx context.Context, reqCtx provider.RequestContext, pro
 	privacyKeywords := []string{"confidential", "private", "secret", "sensitive"}
 	for _, keyword := range privacyKeywords {
 		if strings.Contains(content, keyword) {
-			if _, exists := providers["ollama-local"]; exists {
-				return "ollama-local", nil
+			if _, exists := providers["lmstudio-local"]; exists {
+				return "lmstudio-local", nil
 			}
 		}
 	}

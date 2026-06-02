@@ -116,6 +116,21 @@ func TestBindToolsDoesNotAliasDerivedModels(t *testing.T) {
 	}
 }
 
+func TestBindSkillsDoesNotAliasDerivedModels(t *testing.T) {
+	model := &ChatModel{opts: DefaultOptions(), boundSkills: make([]llms.SkillDefinition, 1, 4)}
+	model.boundSkills[0] = llms.SkillDefinition{Name: "base"}
+
+	left := model.BindSkills(llms.SkillDefinition{Name: "left"}).(*ChatModel)
+	right := model.BindSkills(llms.SkillDefinition{Name: "right"}).(*ChatModel)
+
+	if left.boundSkills[1].Name != "left" {
+		t.Fatalf("expected isolated left skill, got %q", left.boundSkills[1].Name)
+	}
+	if right.boundSkills[1].Name != "right" {
+		t.Fatalf("expected isolated right skill, got %q", right.boundSkills[1].Name)
+	}
+}
+
 func TestWithStructuredOutput(t *testing.T) {
 	model := &ChatModel{opts: DefaultOptions()}
 
@@ -376,6 +391,30 @@ func TestBuildSessionConfig(t *testing.T) {
 		}
 		if len(sessionCfg.AvailableTools) != 1 || sessionCfg.AvailableTools[0] != "calculator" {
 			t.Errorf("expected available tools [calculator], got %v", sessionCfg.AvailableTools)
+		}
+	})
+
+	t.Run("with bound skills", func(t *testing.T) {
+		model := &ChatModel{
+			opts: DefaultOptions(),
+			boundSkills: []llms.SkillDefinition{
+				{Name: "review", Description: "Reviews changes", Instructions: "Focus on regressions."},
+			},
+		}
+
+		messages := []core.Message{core.NewHumanMessage("hello")}
+		cfg := core.DefaultConfig()
+
+		sessionCfg := model.buildSessionConfig(ctx, messages, cfg)
+
+		if len(sessionCfg.Tools) != 0 {
+			t.Fatalf("expected bound skills to remain a no-op for session tools, got %d tools", len(sessionCfg.Tools))
+		}
+		if sessionCfg.AvailableTools == nil {
+			t.Fatal("expected available tools allowlist to be set")
+		}
+		if len(sessionCfg.AvailableTools) != 0 {
+			t.Fatalf("expected no available tools from bound skills, got %v", sessionCfg.AvailableTools)
 		}
 	})
 

@@ -41,11 +41,12 @@ func main() {
 				},
 			},
 			{
-				Name:         "local-ollama",
-				ProviderType: provider.ProviderOllama,
+				Name:         "local-lmstudio",
+				ProviderType: provider.ProviderOpenAI,
 				Options: []provider.ProviderOption{
-					provider.WithModel("llama3.2"),
-					provider.WithBaseURL("http://localhost:11434"),
+					provider.WithModel("qwen2.5-7b-instruct"),
+					provider.WithBaseURL("http://localhost:1234/v1"),
+					provider.WithAPIKey("lm-studio"),
 				},
 			},
 		},
@@ -54,7 +55,7 @@ func main() {
 		// Configure sequential fallback via inline option
 		func(config *provider.RouterConfig) {
 			config.FallbackStrategy = &provider.SequentialFallback{
-				Order: []string{"primary-openai", "backup-anthropic", "local-ollama"},
+				Order: []string{"primary-openai", "backup-anthropic", "local-lmstudio"},
 			}
 		},
 	)
@@ -66,8 +67,8 @@ func main() {
 	fmt.Println("Router created with fallback chain:")
 	fmt.Println("  Primary: primary-openai (gpt-4o-mini)")
 	fmt.Println("  Backup 1: backup-anthropic (claude-3-5-haiku)")
-	fmt.Println("  Backup 2: local-ollama (llama3.2)")
-	fmt.Println("\nIf primary fails → tries backup-anthropic → tries local-ollama")
+	fmt.Println("  Backup 2: local-lmstudio (LM Studio via OpenAI API)")
+	fmt.Println("\nIf primary fails → tries backup-anthropic → tries local-lmstudio")
 	fmt.Println()
 
 	// Test 1: Normal request (should succeed with primary)
@@ -128,7 +129,7 @@ func main() {
 	fmt.Println("\nFallback behavior:")
 	fmt.Println("  - If primary-openai succeeds: request completes immediately")
 	fmt.Println("  - If primary-openai fails: automatically tries backup-anthropic")
-	fmt.Println("  - If backup-anthropic fails: automatically tries local-ollama")
+	fmt.Println("  - If backup-anthropic fails: automatically tries local-lmstudio")
 	fmt.Println("  - If all fail: returns error with details of all attempts")
 	fmt.Println("\nThis ensures high availability even when providers have issues.")
 

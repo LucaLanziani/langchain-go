@@ -18,15 +18,15 @@ func TestRouterInvoke_BasicRouting(t *testing.T) {
 	router, err := NewRouter(ctx,
 		[]ProviderEntry{
 			{
-				Name:         "ollama-1",
-				ProviderType: ProviderOllama,
+				Name:         "openai-1",
+				ProviderType: ProviderOpenAI,
 				Options: []ProviderOption{
-					WithModel("llama3.1"),
-					WithBaseURL("http://localhost:11434"),
+					WithModel("gpt-4o"),
+					WithAPIKey("test-key"),
 				},
 			},
 		},
-		&SimpleStrategy{ProviderName: "ollama-1"},
+		&SimpleStrategy{ProviderName: "openai-1"},
 	)
 	if err != nil {
 		t.Fatalf("Failed to create router: %v", err)
@@ -39,7 +39,7 @@ func TestRouterInvoke_BasicRouting(t *testing.T) {
 	}
 
 	// Test GetProvider
-	provider := router.GetProvider("ollama-1")
+	provider := router.GetProvider("openai-1")
 	if provider == nil {
 		t.Error("GetProvider should return non-nil provider")
 	}
@@ -49,8 +49,8 @@ func TestRouterInvoke_BasicRouting(t *testing.T) {
 	if len(providers) != 1 {
 		t.Errorf("Expected 1 provider, got %d", len(providers))
 	}
-	if providers[0] != "ollama-1" {
-		t.Errorf("Expected provider name 'ollama-1', got '%s'", providers[0])
+	if providers[0] != "openai-1" {
+		t.Errorf("Expected provider name 'openai-1', got '%s'", providers[0])
 	}
 
 	// Test GetMetrics
@@ -58,8 +58,8 @@ func TestRouterInvoke_BasicRouting(t *testing.T) {
 	if metrics == nil {
 		t.Error("GetMetrics should return non-nil metrics")
 	}
-	if _, ok := metrics["ollama-1"]; !ok {
-		t.Error("Metrics should contain 'ollama-1' provider")
+	if _, ok := metrics["openai-1"]; !ok {
+		t.Error("Metrics should contain 'openai-1' provider")
 	}
 }
 
@@ -72,7 +72,7 @@ func TestRouterInvoke_MetricsTracking(t *testing.T) {
 
 	customStrategy := &CustomStrategy{
 		SelectFunc: func(ctx context.Context, reqCtx RequestContext, providers map[string]llms.ChatModel) (string, error) {
-			return "ollama-1", nil
+			return "openai-1", nil
 		},
 		OnSuccessFunc: func(ctx context.Context, providerName string, latency time.Duration) {
 			successCalled = true
@@ -85,11 +85,11 @@ func TestRouterInvoke_MetricsTracking(t *testing.T) {
 	router, err := NewRouter(ctx,
 		[]ProviderEntry{
 			{
-				Name:         "ollama-1",
-				ProviderType: ProviderOllama,
+				Name:         "openai-1",
+				ProviderType: ProviderOpenAI,
 				Options: []ProviderOption{
-					WithModel("llama3.1"),
-					WithBaseURL("http://localhost:11434"),
+					WithModel("gpt-4o"),
+					WithAPIKey("test-key"),
 				},
 			},
 		},
@@ -102,9 +102,9 @@ func TestRouterInvoke_MetricsTracking(t *testing.T) {
 
 	// Get initial metrics
 	initialMetrics := router.GetMetrics()
-	initialCount := initialMetrics["ollama-1"].RequestCount
+	initialCount := initialMetrics["openai-1"].RequestCount
 
-	// Note: We can't actually invoke without a running Ollama server,
+	// Note: We don't invoke the backing model here,
 	// but we can verify the structure is correct
 	t.Logf("Initial request count: %d", initialCount)
 	t.Logf("Strategy callbacks ready: success=%v, error=%v", successCalled, errorCalled)
@@ -173,18 +173,18 @@ func TestRouterInvoke_HelperMethods(t *testing.T) {
 		[]ProviderEntry{
 			{
 				Name:         "provider-1",
-				ProviderType: ProviderOllama,
+				ProviderType: ProviderOpenAI,
 				Options: []ProviderOption{
-					WithModel("llama3.1"),
-					WithBaseURL("http://localhost:11434"),
+					WithModel("gpt-4o"),
+					WithAPIKey("test-key"),
 				},
 			},
 			{
 				Name:         "provider-2",
-				ProviderType: ProviderOllama,
+				ProviderType: ProviderOpenAI,
 				Options: []ProviderOption{
-					WithModel("llama3.1"),
-					WithBaseURL("http://localhost:11434"),
+					WithModel("gpt-4o"),
+					WithAPIKey("test-key"),
 				},
 			},
 		},
@@ -266,15 +266,15 @@ func TestRouterInvoke_AfterCleanup(t *testing.T) {
 	router, err := NewRouter(ctx,
 		[]ProviderEntry{
 			{
-				Name:         "ollama-1",
-				ProviderType: ProviderOllama,
+				Name:         "openai-1",
+				ProviderType: ProviderOpenAI,
 				Options: []ProviderOption{
-					WithModel("llama3.1"),
-					WithBaseURL("http://localhost:11434"),
+					WithModel("gpt-4o"),
+					WithAPIKey("test-key"),
 				},
 			},
 		},
-		&SimpleStrategy{ProviderName: "ollama-1"},
+		&SimpleStrategy{ProviderName: "openai-1"},
 	)
 	if err != nil {
 		t.Fatalf("Failed to create router: %v", err)
@@ -287,7 +287,7 @@ func TestRouterInvoke_AfterCleanup(t *testing.T) {
 
 	// Test methods after cleanup
 	t.Run("GetProvider after cleanup", func(t *testing.T) {
-		provider := router.GetProvider("ollama-1")
+		provider := router.GetProvider("openai-1")
 		if provider != nil {
 			t.Error("GetProvider should return nil after cleanup")
 		}

@@ -56,6 +56,7 @@ func (m *streamTestModel) Generate(ctx context.Context, messages []core.Message,
 
 func (m *streamTestModel) GetName() string                                    { return m.name }
 func (m *streamTestModel) BindTools(...llms.ToolDefinition) llms.ChatModel    { return m }
+func (m *streamTestModel) BindSkills(...llms.SkillDefinition) llms.ChatModel  { return m }
 func (m *streamTestModel) WithStructuredOutput(map[string]any) llms.ChatModel { return m }
 
 func TestRouterStreamMetricsRecordCompletion(t *testing.T) {

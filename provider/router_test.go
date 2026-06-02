@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LucaLanziani/langchain-go/core"
 	"github.com/LucaLanziani/langchain-go/llms"
 )
 
@@ -32,6 +33,83 @@ func (m *mockStrategy) OnSuccess(ctx context.Context, providerName string, laten
 
 func (m *mockStrategy) OnError(ctx context.Context, providerName string, err error) {
 	// No-op for testing
+}
+
+type skillBindingModel struct {
+	name        string
+	boundSkills []llms.SkillDefinition
+}
+
+func (m *skillBindingModel) Invoke(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.AIMessage, error) {
+	return core.NewAIMessage("ok"), nil
+}
+
+func (m *skillBindingModel) Stream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.StreamIterator[*core.AIMessage], error) {
+	ch := make(chan core.StreamChunk[*core.AIMessage], 1)
+	ch <- core.StreamChunk[*core.AIMessage]{Value: core.NewAIMessage("ok")}
+	close(ch)
+	return core.NewStreamIterator(ch), nil
+}
+
+func (m *skillBindingModel) Batch(ctx context.Context, inputs [][]core.Message, opts ...core.Option) ([]*core.AIMessage, error) {
+	results := make([]*core.AIMessage, len(inputs))
+	for i := range inputs {
+		results[i] = core.NewAIMessage("ok")
+	}
+	return results, nil
+}
+
+func (m *skillBindingModel) Generate(ctx context.Context, messages []core.Message, opts ...core.Option) (*llms.ChatResult, error) {
+	return &llms.ChatResult{Generations: []*llms.ChatGeneration{{Message: core.NewAIMessage("ok")}}}, nil
+}
+
+func (m *skillBindingModel) GetName() string {
+	return m.name
+}
+
+func (m *skillBindingModel) BindTools(...llms.ToolDefinition) llms.ChatModel {
+	return m
+}
+
+func (m *skillBindingModel) BindSkills(skills ...llms.SkillDefinition) llms.ChatModel {
+	cp := *m
+	cp.boundSkills = append(append([]llms.SkillDefinition(nil), m.boundSkills...), skills...)
+	return &cp
+}
+
+func (m *skillBindingModel) WithStructuredOutput(map[string]any) llms.ChatModel {
+	return m
+}
+
+func TestRouterBindSkillsFansOutToProviders(t *testing.T) {
+	left := &skillBindingModel{name: "left"}
+	right := &skillBindingModel{name: "right"}
+	router := &Router{providers: map[string]llms.ChatModel{
+		"left":  left,
+		"right": right,
+	}}
+
+	skill := llms.SkillDefinition{Name: "review", Description: "Reviews changes"}
+	if got := router.BindSkills(skill); got != router {
+		t.Fatal("expected BindSkills to return the router")
+	}
+
+	if len(left.boundSkills) != 0 {
+		t.Fatalf("expected original left provider to remain unchanged, got %d skills", len(left.boundSkills))
+	}
+	if len(right.boundSkills) != 0 {
+		t.Fatalf("expected original right provider to remain unchanged, got %d skills", len(right.boundSkills))
+	}
+
+	boundLeft := router.providers["left"].(*skillBindingModel)
+	boundRight := router.providers["right"].(*skillBindingModel)
+
+	if len(boundLeft.boundSkills) != 1 || boundLeft.boundSkills[0].Name != "review" {
+		t.Fatalf("expected left provider to receive bound skill, got %#v", boundLeft.boundSkills)
+	}
+	if len(boundRight.boundSkills) != 1 || boundRight.boundSkills[0].Name != "review" {
+		t.Fatalf("expected right provider to receive bound skill, got %#v", boundRight.boundSkills)
+	}
 }
 
 // TestProperty9_RouterCleanupCompleteness tests that router cleanup calls
@@ -85,10 +163,11 @@ func TestProperty9_RouterCleanupCompleteness(t *testing.T) {
 					},
 				},
 				{
-					Name:         "ollama",
-					ProviderType: ProviderOllama,
+					Name:         "openai-backup",
+					ProviderType: ProviderOpenAI,
 					Options: []ProviderOption{
-						WithModel("llama3.1"),
+						WithModel("gpt-4o-mini"),
+						WithAPIKey("test-key"),
 					},
 				},
 			},
@@ -130,8 +209,8 @@ func TestProperty9_RouterCleanupCompleteness(t *testing.T) {
 				{Name: "openai-2", ProviderType: ProviderOpenAI, Options: []ProviderOption{WithModel("gpt-4o"), WithAPIKey("test-key")}},
 				{Name: "anthropic-1", ProviderType: ProviderAnthropic, Options: []ProviderOption{WithModel("claude-sonnet-4-20250514"), WithMaxTokens(4096), WithAPIKey("test-key")}},
 				{Name: "anthropic-2", ProviderType: ProviderAnthropic, Options: []ProviderOption{WithModel("claude-sonnet-4-20250514"), WithMaxTokens(4096), WithAPIKey("test-key")}},
-				{Name: "ollama-1", ProviderType: ProviderOllama, Options: []ProviderOption{WithModel("llama3.1")}},
-				{Name: "ollama-2", ProviderType: ProviderOllama, Options: []ProviderOption{WithModel("llama3.1")}},
+				{Name: "openai-3", ProviderType: ProviderOpenAI, Options: []ProviderOption{WithModel("gpt-4o-mini"), WithAPIKey("test-key")}},
+				{Name: "openai-4", ProviderType: ProviderOpenAI, Options: []ProviderOption{WithModel("gpt-4o-mini"), WithAPIKey("test-key")}},
 			},
 		},
 	}
@@ -260,10 +339,11 @@ func TestProperty9_RouterCleanupCompleteness_ConcurrentCleanup(t *testing.T) {
 			},
 		},
 		{
-			Name:         "ollama",
-			ProviderType: ProviderOllama,
+			Name:         "openai-backup",
+			ProviderType: ProviderOpenAI,
 			Options: []ProviderOption{
-				WithModel("llama3.1"),
+				WithModel("gpt-4o-mini"),
+				WithAPIKey("test-key"),
 			},
 		},
 	}
@@ -401,10 +481,11 @@ func TestProperty9_RouterCleanupCompleteness_WithCustomCleanup(t *testing.T) {
 			},
 		},
 		{
-			Name:         "ollama",
-			ProviderType: ProviderOllama,
+			Name:         "openai-backup",
+			ProviderType: ProviderOpenAI,
 			Options: []ProviderOption{
-				WithModel("llama3.1"),
+				WithModel("gpt-4o-mini"),
+				WithAPIKey("test-key"),
 			},
 		},
 	}
@@ -430,9 +511,9 @@ func TestProperty9_RouterCleanupCompleteness_WithCustomCleanup(t *testing.T) {
 			cleanup2Called.Add(1)
 			return originalCleanups["anthropic"]()
 		},
-		"ollama": func() error {
+		"openai-backup": func() error {
 			cleanup3Called.Add(1)
-			return originalCleanups["ollama"]()
+			return originalCleanups["openai-backup"]()
 		},
 	}
 

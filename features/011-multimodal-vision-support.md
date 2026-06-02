@@ -136,17 +136,6 @@ Convert to Anthropic's content block format:
 }
 ```
 
-#### Ollama (`providers/ollama/chat.go`)
-
-Convert to Ollama's images field:
-```json
-{
-    "role": "user",
-    "content": "What's in this image?",
-    "images": ["base64data..."]
-}
-```
-
 ### Backward Compatibility
 
 - `GetContent()` on a multimodal message returns the concatenated text parts.

@@ -12,7 +12,7 @@
 
 - I can call `model.WithStructuredOutput(MyStruct{})` to get a model that returns `MyStruct` instead of `*AIMessage`.
 - The schema is automatically generated from the Go struct's tags (`json`, `description`, `required`, `enum`).
-- Works with OpenAI's JSON mode / response_format, Anthropic's tool-based structured output, and Ollama's format=json.
+- Works with OpenAI's JSON mode / response_format and Anthropic's tool-based structured output.
 - If the model returns invalid JSON or a response that doesn't match the schema, a clear validation error is returned.
 - Optional retry: on validation failure, automatically re-prompt the model with the error message (configurable max retries).
 - A `StructuredOutputParser[T]` can be used standalone in chains (not only through the model wrapper).
@@ -103,8 +103,6 @@ Enhance `WithStructuredOutput` on each provider:
 1. **OpenAI**: Use `response_format: {"type": "json_schema", "json_schema": {...}}` (GPT-4o+) or fall back to `response_format: {"type": "json_object"}` with schema in the system prompt.
 
 2. **Anthropic**: Use tool-based structured output — define a single tool with the schema, force tool use, extract the args as the result.
-
-3. **Ollama**: Use `format: "json"` with schema in the system prompt.
 
 The `WithStructuredOutput` method returns a `Runnable[[]Message, T]` that wraps the model and parser together.
 

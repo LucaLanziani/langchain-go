@@ -810,4 +810,5 @@ func (m *mockAgentLLM) Generate(_ context.Context, _ []core.Message, _ ...core.O
 
 func (m *mockAgentLLM) GetName() string                                    { return "MockAgentLLM" }
 func (m *mockAgentLLM) BindTools(...llms.ToolDefinition) llms.ChatModel    { return m }
+func (m *mockAgentLLM) BindSkills(...llms.SkillDefinition) llms.ChatModel  { return m }
 func (m *mockAgentLLM) WithStructuredOutput(map[string]any) llms.ChatModel { return m }

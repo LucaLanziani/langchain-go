@@ -50,30 +50,15 @@ func (m *mockProvider) BindTools(tools ...llms.ToolDefinition) llms.ChatModel {
 	return m
 }
 
+func (m *mockProvider) BindSkills(skills ...llms.SkillDefinition) llms.ChatModel {
+	return m
+}
+
 func (m *mockProvider) WithStructuredOutput(schema map[string]any) llms.ChatModel {
 	return m
 }
 
 // ===== Provider Creation Benchmarks =====
-
-func BenchmarkNewProvider_Ollama(b *testing.B) {
-	ctx := context.Background()
-	opts := []ProviderOption{
-		WithModel("llama2"),
-		WithTemperature(0.7),
-		WithMaxTokens(100),
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		model, cleanup, err := NewProvider(ctx, ProviderOllama, opts...)
-		if err != nil {
-			b.Fatal(err)
-		}
-		_ = cleanup()
-		_ = model
-	}
-}
 
 func BenchmarkNewProvider_OpenAI(b *testing.B) {
 	ctx := context.Background()
@@ -130,16 +115,15 @@ func BenchmarkNewRouter_10Providers(b *testing.B) {
 
 func benchmarkNewRouter(b *testing.B, numProviders int) {
 	ctx := context.Background()
-	maxTokens := 1000
 
 	entries := make([]ProviderEntry, numProviders)
 	for i := 0; i < numProviders; i++ {
 		entries[i] = ProviderEntry{
-			Name:         "ollama-" + string(rune('a'+i)),
-			ProviderType: ProviderOllama,
+			Name:         "provider-" + string(rune('a'+i)),
+			ProviderType: ProviderOpenAI,
 			Options: []ProviderOption{
-				WithModel("llama2"),
-				WithMaxTokens(maxTokens),
+				WithModel("gpt-4o"),
+				WithAPIKey("test-key"),
 			},
 		}
 	}

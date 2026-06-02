@@ -20,6 +20,12 @@ type ChatModel interface {
 	// when generating responses.
 	BindTools(tools ...ToolDefinition) ChatModel
 
+	// BindSkills returns a new ChatModel that will use the given skill
+	// definitions when generating responses. Binding a skill does not guarantee
+	// provider-side emission in the first iteration; providers without native
+	// skill handling ignore bound skills silently.
+	BindSkills(skills ...SkillDefinition) ChatModel
+
 	// WithStructuredOutput configures the model to return structured output
 	// matching the given JSON schema.
 	WithStructuredOutput(schema map[string]any) ChatModel
@@ -34,5 +40,24 @@ type ToolDefinition struct {
 	Description string `json:"description"`
 
 	// Parameters is a JSON Schema describing the tool's parameters.
+	Parameters map[string]any `json:"parameters"`
+}
+
+// SkillDefinition describes a reusable provider-native skill that can be bound
+// to a chat model. Binding a skill does not guarantee provider-side emission in
+// the first iteration; providers without native skill support ignore bound
+// skills silently.
+type SkillDefinition struct {
+	// Name of the skill.
+	Name string `json:"name"`
+
+	// Description of what the skill does.
+	Description string `json:"description"`
+
+	// Instructions contains provider-neutral guidance associated with the skill.
+	Instructions string `json:"instructions"`
+
+	// Parameters is an optional JSON Schema describing the skill's expected
+	// inputs for providers that support structured skill configuration.
 	Parameters map[string]any `json:"parameters"`
 }

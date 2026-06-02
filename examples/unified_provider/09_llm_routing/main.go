@@ -46,11 +46,12 @@ func main() {
 				},
 			},
 			{
-				Name:         "local-ollama",
-				ProviderType: provider.ProviderOllama,
+				Name:         "local-lmstudio",
+				ProviderType: provider.ProviderOpenAI,
 				Options: []provider.ProviderOption{
-					provider.WithModel("llama3.2"),
-					provider.WithBaseURL("http://localhost:11434"),
+					provider.WithModel("qwen2.5-7b-instruct"),
+					provider.WithBaseURL("http://localhost:1234/v1"),
+					provider.WithAPIKey("lm-studio"),
 				},
 			},
 		},
@@ -68,7 +69,7 @@ func main() {
 	fmt.Println("Routing logic:")
 	fmt.Println("  - Simple queries → fast-openai")
 	fmt.Println("  - Complex reasoning/code → smart-anthropic")
-	fmt.Println("  - Privacy-sensitive → local-ollama")
+	fmt.Println("  - Privacy-sensitive → local-lmstudio")
 	fmt.Println()
 
 	// Test different types of requests
@@ -100,7 +101,7 @@ func main() {
 	}
 	fmt.Println()
 
-	// Test 3: Privacy-sensitive request (should route to local-ollama)
+	// Test 3: Privacy-sensitive request (should route to local-lmstudio)
 	fmt.Println("=== Test 3: Privacy-Sensitive Request ===")
 	fmt.Println("Question: Analyze this confidential business strategy")
 	response, err = router.Invoke(ctx, []core.Message{
@@ -174,8 +175,8 @@ func intelligentRoutingLogic(ctx context.Context, reqCtx provider.RequestContext
 
 	// Check for privacy-sensitive requests
 	if privacy, ok := reqCtx.UserMetadata["privacy"].(string); ok && privacy == "high" {
-		if _, exists := providers["local-ollama"]; exists {
-			return "local-ollama", nil
+		if _, exists := providers["local-lmstudio"]; exists {
+			return "local-lmstudio", nil
 		}
 	}
 

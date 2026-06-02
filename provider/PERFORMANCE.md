@@ -5,7 +5,6 @@ This document describes the performance optimizations applied to the provider pa
 ## Benchmark Results
 
 ### Provider Creation
-- **Ollama**: ~316ns, 552B, 14 allocs
 - **OpenAI**: ~249ns, 472B, 9 allocs
 - **Anthropic**: ~278ns, 488B, 11 allocs
 

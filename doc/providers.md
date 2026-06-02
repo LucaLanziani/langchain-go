@@ -14,10 +14,14 @@ type ChatModel interface {
     core.Runnable[[]core.Message, *core.AIMessage]
 
     // Generate is the lower-level batched inference call.
-    Generate(ctx context.Context, messageSets [][]core.Message, opts ...core.Option) (*ChatResult, error)
+    Generate(ctx context.Context, messages []core.Message, opts ...core.Option) (*ChatResult, error)
 
     // BindTools returns a new ChatModel that will always send tool definitions.
     BindTools(tools ...ToolDefinition) ChatModel
+
+    // BindSkills returns a new ChatModel that will always send skill definitions
+    // when the provider supports native skills.
+    BindSkills(skills ...SkillDefinition) ChatModel
 
     // WithStructuredOutput returns a ChatModel configured for structured JSON output.
     WithStructuredOutput(schema map[string]any) ChatModel
@@ -33,14 +37,69 @@ classDiagram
         +Invoke(ctx, []Message, ...Option) (*AIMessage, error)
         +Stream(ctx, []Message, ...Option) (*StreamIterator[AIMessage], error)
         +Batch(ctx, [][]Message, ...Option) ([]*AIMessage, error)
-        +Generate(ctx, [][]Message, ...Option) (*ChatResult, error)
+        +Generate(ctx, []Message, ...Option) (*ChatResult, error)
         +BindTools(...ToolDefinition) ChatModel
+        +BindSkills(...SkillDefinition) ChatModel
         +WithStructuredOutput(schema) ChatModel
         +GetName() string
     }
     ChatModel <|-- openai.ChatModel
     ChatModel <|-- anthropic.ChatModel
     ChatModel <|-- copilot.ChatModel
+```
+
+---
+
+## Testing With LM Studio
+
+The OpenAI and Anthropic providers include build-tagged integration tests that can be run against a local LM Studio instance.
+
+Run them with:
+
+```bash
+make test-lmstudio-integration
+```
+
+The Make target runs:
+
+```bash
+go test -tags=integration ./providers/anthropic ./providers/openai -run TestLMStudio -v
+```
+
+Makefile defaults:
+
+| Variable              | Default              | Description                               |
+| --------------------- | -------------------- | ----------------------------------------- |
+| `LMSTUDIO_HOST`       | `127.0.0.1`          | Shared host for both provider tests       |
+| `LMSTUDIO_PORT`       | `1234`               | Shared port for both provider tests       |
+| `LMSTUDIO_MODEL`      | `openai/gpt-oss-20b` | Shared model for both provider tests      |
+| `LMSTUDIO_AUTH_TOKEN` | `lmstudio`           | Shared auth token for both provider tests |
+
+Provider-specific overrides:
+
+| Variable                        | Description                                 |
+| ------------------------------- | ------------------------------------------- |
+| `LMSTUDIO_OPENAI_BASE_URL`      | Full OpenAI-compatible base URL override    |
+| `LMSTUDIO_OPENAI_MODEL`         | OpenAI-compatible model override            |
+| `LMSTUDIO_OPENAI_AUTH_TOKEN`    | OpenAI-compatible auth token override       |
+| `LMSTUDIO_ANTHROPIC_BASE_URL`   | Full Anthropic-compatible base URL override |
+| `LMSTUDIO_ANTHROPIC_MODEL`      | Anthropic-compatible model override         |
+| `LMSTUDIO_ANTHROPIC_AUTH_TOKEN` | Anthropic-compatible auth token override    |
+
+The Anthropic-compatible LM Studio endpoint is exposed under `/v1/messages`, so the Anthropic integration test uses `/v1` as its base URL.
+
+Examples:
+
+```bash
+make test-lmstudio-integration LMSTUDIO_HOST=10.0.0.130 LMSTUDIO_PORT=1234
+```
+
+```bash
+make test-lmstudio-integration \
+    LMSTUDIO_HOST=10.0.0.130 \
+    LMSTUDIO_PORT=1234 \
+    LMSTUDIO_MODEL=openai/gpt-oss-20b \
+    LMSTUDIO_AUTH_TOKEN=lmstudio
 ```
 
 ---
@@ -74,12 +133,12 @@ fmt.Println(resp.Content)
 
 ### Options
 
-| Option | Default | Description |
-|---|---|---|
-| `WithAPIKey(key)` | `$OPENAI_API_KEY` | API key |
-| `WithModelName(model)` | `"gpt-4o"` | Model identifier |
-| `WithBaseURL(url)` | `"https://api.openai.com/v1"` | Base URL (useful for proxies or Azure OpenAI) |
-| `WithOrganization(org)` | — | OpenAI organization ID |
+| Option                  | Default                       | Description                                   |
+| ----------------------- | ----------------------------- | --------------------------------------------- |
+| `WithAPIKey(key)`       | `$OPENAI_API_KEY`             | API key                                       |
+| `WithModelName(model)`  | `"gpt-4o"`                    | Model identifier                              |
+| `WithBaseURL(url)`      | `"https://api.openai.com/v1"` | Base URL (useful for proxies or Azure OpenAI) |
+| `WithOrganization(org)` | —                             | OpenAI organization ID                        |
 
 > Global inference options (`WithTemperature`, `WithMaxTokens`, `WithTopP`) from `llms/options.go` are also accepted by all `Invoke`/`Stream`/`Batch` calls via `core.Option`.
 
@@ -134,12 +193,12 @@ model = anthropic.New(
 
 ### Options
 
-| Option | Default | Description |
-|---|---|---|
-| `WithAPIKey(key)` | `$ANTHROPIC_API_KEY` | API key |
-| `WithModelName(model)` | `"claude-sonnet-4-20250514"` | Model identifier |
-| `WithBaseURL(url)` | `"https://api.anthropic.com/v1"` | Base URL override |
-| `WithMaxTokens(n)` | `4096` | Maximum output tokens (required by Anthropic API) |
+| Option                 | Default                          | Description                                       |
+| ---------------------- | -------------------------------- | ------------------------------------------------- |
+| `WithAPIKey(key)`      | `$ANTHROPIC_API_KEY`             | API key                                           |
+| `WithModelName(model)` | `"claude-sonnet-4-20250514"`     | Model identifier                                  |
+| `WithBaseURL(url)`     | `"https://api.anthropic.com/v1"` | Base URL override                                 |
+| `WithMaxTokens(n)`     | `4096`                           | Maximum output tokens (required by Anthropic API) |
 
 ### System message handling
 
@@ -171,14 +230,14 @@ model, err = copilot.New(
 
 ### Options
 
-| Option | Default | Description |
-|---|---|---|
-| `WithGithubToken(token)` | `$GITHUB_TOKEN` | GitHub personal access token |
-| `WithModelName(model)` | `"gpt-5-mini"` | Model identifier |
-| `WithCLIPath(path)` | `"copilot"` | Path to the Copilot CLI executable |
-| `WithLogLevel(level)` | `"error"` | Log level for the CLI server |
-| `WithMaxConcurrency(n)` | `5` | Maximum parallel sessions in `Batch` |
-| `WithTools(tools...)` | — | Pre-bind tools; the SDK manages the tool-calling loop internally |
+| Option                   | Default         | Description                                                      |
+| ------------------------ | --------------- | ---------------------------------------------------------------- |
+| `WithGithubToken(token)` | `$GITHUB_TOKEN` | GitHub personal access token                                     |
+| `WithModelName(model)`   | `"gpt-5-mini"`  | Model identifier                                                 |
+| `WithCLIPath(path)`      | `"copilot"`     | Path to the Copilot CLI executable                               |
+| `WithLogLevel(level)`    | `"error"`       | Log level for the CLI server                                     |
+| `WithMaxConcurrency(n)`  | `5`             | Maximum parallel sessions in `Batch`                             |
+| `WithTools(tools...)`    | —               | Pre-bind tools; the SDK manages the tool-calling loop internally |
 
 > **Important:** Always call `model.Close()` when done to shut down the underlying CLI server process.
 
@@ -228,6 +287,35 @@ type ToolDefinition struct {
 }
 ```
 
+### `SkillDefinition`
+
+```go
+// llms/chatmodel.go
+type SkillDefinition struct {
+    Name         string         `json:"name"`
+    Description  string         `json:"description"`
+    Instructions string         `json:"instructions"`
+    Parameters   map[string]any `json:"parameters"` // Optional JSON Schema
+}
+```
+
+## Skills
+
+Models and routers can also bind provider-native skills:
+
+```go
+reviewSkill := llms.SkillDefinition{
+    Name:         "review",
+    Description:  "Review code changes for regressions.",
+    Instructions: "Prioritize correctness, behavioral regressions, and missing tests.",
+}
+
+model = model.BindSkills(reviewSkill)
+router.BindSkills(reviewSkill)
+```
+
+Binding skills is provider-dependent in the current release. Supported providers preserve and propagate the bound definitions, but providers without a concrete native mapping ignore them silently instead of failing or emulating skills through prompt injection.
+
 ---
 
 ## Structured Output
@@ -259,7 +347,81 @@ flowchart TD
     Q1 -- Yes --> Copilot["github-copilot provider"]
     Q1 -- No --> Q2{"Do you prefer open weights\nor Claude?"}
     Q2 -- Claude --> Anthropic["anthropic provider"]
-    Q2 -- OpenAI-compatible --> OpenAI["openai provider\n(also works with Azure,\nGroq, Ollama, etc.)"]
+    Q2 -- OpenAI-compatible --> OpenAI["openai provider\n(also works with Azure,\nGroq, LM Studio, etc.)"]
 ```
 
-The OpenAI provider works with any OpenAI-compatible API by overriding `WithBaseURL`. Point it at Groq, Ollama, or Azure OpenAI Service as needed.
+The OpenAI provider works with any OpenAI-compatible API by overriding `WithBaseURL`. Point it at Groq, LM Studio, or Azure OpenAI Service as needed.
+
+### LM Studio For Local Models
+
+LM Studio can serve local models through OpenAI-compatible and Anthropic-compatible endpoints. In langchain-go you do not need a dedicated provider for that. Use the existing `openai` or `anthropic` provider and override the base URL.
+
+Before using either endpoint:
+
+1. Start LM Studio's local server on the default port `1234`.
+2. Load a model in LM Studio and note its model identifier.
+3. If LM Studio auth is disabled, any placeholder token is fine. If auth is enabled, use your LM Studio API token.
+
+#### OpenAI-compatible endpoint
+
+LM Studio exposes the OpenAI-compatible API under `http://localhost:1234/v1`.
+
+```go
+model := openai.New(
+    openai.WithModelName("qwen2.5-7b-instruct"),
+    openai.WithBaseURL("http://localhost:1234/v1"),
+    openai.WithAPIKey("lm-studio"),
+)
+```
+
+Using the unified provider package:
+
+```go
+model, cleanup, err := provider.NewProvider(
+    ctx,
+    provider.ProviderOpenAI,
+    provider.WithModel("qwen2.5-7b-instruct"),
+    provider.WithBaseURL("http://localhost:1234/v1"),
+    provider.WithAPIKey("lm-studio"),
+)
+if err != nil {
+    return err
+}
+defer cleanup()
+```
+
+#### Anthropic-compatible endpoint
+
+LM Studio also exposes an Anthropic-compatible Messages API at `POST /v1/messages`. For this repo's Anthropic provider, set the base URL to `http://localhost:1234/v1` so requests are sent to `/v1/messages`.
+
+```go
+model := anthropic.New(
+    anthropic.WithModelName("openai/gpt-oss-20b"),
+    anthropic.WithBaseURL("http://localhost:1234/v1"),
+    anthropic.WithAPIKey("lm-studio"),
+    anthropic.WithMaxTokens(1024),
+)
+```
+
+Using the unified provider package:
+
+```go
+model, cleanup, err := provider.NewProvider(
+    ctx,
+    provider.ProviderAnthropic,
+    provider.WithModel("openai/gpt-oss-20b"),
+    provider.WithBaseURL("http://localhost:1234/v1"),
+    provider.WithAPIKey("lm-studio"),
+    provider.WithMaxTokens(1024),
+)
+if err != nil {
+    return err
+}
+defer cleanup()
+```
+
+Notes:
+
+1. `ProviderAnthropic` requires `WithMaxTokens`, even when backed by LM Studio.
+2. If LM Studio authentication is enabled, replace `lm-studio` with the real LM Studio token.
+3. Tool calling and structured output behavior still depend on the local model you load in LM Studio.

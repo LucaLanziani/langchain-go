@@ -16,33 +16,6 @@ func WithOrganization(organization string) ProviderOption {
 	return WithProviderSpecific("organization", organization)
 }
 
-// ===== Ollama-Specific Options =====
-
-// WithKeepAlive sets the keep_alive duration for Ollama models
-// Controls how long the model stays loaded in memory
-// Examples: "5m", "10m", "-1" (keep forever), "0" (unload immediately)
-func WithKeepAlive(keepAlive string) ProviderOption {
-	return WithProviderSpecific("keep_alive", keepAlive)
-}
-
-// WithFormat sets the response format for Ollama
-// Currently supports "json" for JSON-formatted responses
-func WithFormat(format string) ProviderOption {
-	return WithProviderSpecific("format", format)
-}
-
-// WithNumCtx sets the context window size for Ollama models
-// Determines how many tokens the model can consider
-func WithNumCtx(numCtx int) ProviderOption {
-	return WithProviderSpecific("num_ctx", numCtx)
-}
-
-// WithTopK sets the top-k sampling parameter for Ollama
-// Limits the next token selection to the K most likely tokens
-func WithTopK(topK int) ProviderOption {
-	return WithProviderSpecific("top_k", topK)
-}
-
 // ===== GitHub Copilot-Specific Options =====
 
 // WithTools sets the tools available to GitHub Copilot
