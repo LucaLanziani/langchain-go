@@ -43,20 +43,21 @@ func main() {
 				Weight: 20, // 20% of requests
 			},
 			{
-				Name:         "local-ollama",
-				ProviderType: provider.ProviderOllama,
+				Name:         "local-lmstudio",
+				ProviderType: provider.ProviderOpenAI,
 				Options: []provider.ProviderOption{
-					provider.WithModel("llama3.2"),
-					provider.WithBaseURL("http://localhost:11434"),
+					provider.WithModel("qwen2.5-7b-instruct"),
+					provider.WithBaseURL("http://localhost:1234/v1"),
+					provider.WithAPIKey("lm-studio"),
 				},
 				Weight: 10, // 10% of requests
 			},
 		},
 		// WeightedStrategy distributes based on weights
 		provider.NewWeightedStrategy(map[string]int{
-			"fast-gpt35":   70,
-			"smart-gpt4":   20,
-			"local-ollama": 10,
+			"fast-gpt35":     70,
+			"smart-gpt4":     20,
+			"local-lmstudio": 10,
 		}),
 	)
 	if err != nil {
@@ -67,7 +68,7 @@ func main() {
 	fmt.Println("Router created with weighted distribution:")
 	fmt.Println("  - fast-gpt35 (gpt-3.5-turbo): 70% weight")
 	fmt.Println("  - smart-gpt4 (gpt-4o-mini): 20% weight")
-	fmt.Println("  - local-ollama (llama3.2): 10% weight")
+	fmt.Println("  - local-lmstudio (LM Studio via OpenAI API): 10% weight")
 	fmt.Println("\nMaking 20 requests to observe distribution...")
 
 	// Make 20 requests to see weighted distribution
@@ -118,5 +119,5 @@ func main() {
 
 	fmt.Println("=== Example Complete ===")
 	fmt.Println("Note: Distribution should approximate the configured weights:")
-	fmt.Println("  fast-gpt35 ~70%, smart-gpt4 ~20%, local-ollama ~10%")
+	fmt.Println("  fast-gpt35 ~70%, smart-gpt4 ~20%, local-lmstudio ~10%")
 }

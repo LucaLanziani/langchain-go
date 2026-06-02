@@ -40,11 +40,12 @@ func main() {
 				},
 			},
 			{
-				Name:         "local-ollama",
-				ProviderType: provider.ProviderOllama,
+				Name:         "local-lmstudio",
+				ProviderType: provider.ProviderOpenAI,
 				Options: []provider.ProviderOption{
-					provider.WithModel("llama3.2"),
-					provider.WithBaseURL("http://localhost:11434"),
+					provider.WithModel("qwen2.5-7b-instruct"),
+					provider.WithBaseURL("http://localhost:1234/v1"),
+					provider.WithAPIKey("lm-studio"),
 				},
 			},
 		},
@@ -64,10 +65,10 @@ func main() {
 					Name:     "simple-to-local",
 					Priority: 90,
 					Condition: func(reqCtx provider.RequestContext) bool {
-						// Route simple, short requests to local Ollama
+						// Route simple, short requests to the local LM Studio model
 						return reqCtx.Complexity == "simple" && reqCtx.TotalTokens < 500
 					},
-					Provider: "local-ollama",
+					Provider: "local-lmstudio",
 				},
 				{
 					Name:     "high-priority-to-openai",
@@ -89,14 +90,14 @@ func main() {
 
 	fmt.Println("Router created with rule-based routing:")
 	fmt.Println("  Rule 1 (Priority 100): Complex requests → smart-anthropic")
-	fmt.Println("  Rule 2 (Priority 90): Simple requests → local-ollama")
+	fmt.Println("  Rule 2 (Priority 90): Simple requests → local-lmstudio")
 	fmt.Println("  Rule 3 (Priority 80): High priority → fast-openai")
 	fmt.Println("  Default: fast-openai")
 	fmt.Println()
 
 	// Test different types of requests
 
-	// Test 1: Simple request (should go to local-ollama)
+	// Test 1: Simple request (should go to local-lmstudio)
 	fmt.Println("=== Test 1: Simple Request ===")
 	fmt.Println("Question: What is 2+2?")
 	response, err := router.Invoke(ctx, []core.Message{

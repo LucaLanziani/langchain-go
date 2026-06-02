@@ -347,7 +347,81 @@ flowchart TD
     Q1 -- Yes --> Copilot["github-copilot provider"]
     Q1 -- No --> Q2{"Do you prefer open weights\nor Claude?"}
     Q2 -- Claude --> Anthropic["anthropic provider"]
-    Q2 -- OpenAI-compatible --> OpenAI["openai provider\n(also works with Azure,\nGroq, Ollama, etc.)"]
+    Q2 -- OpenAI-compatible --> OpenAI["openai provider\n(also works with Azure,\nGroq, LM Studio, etc.)"]
 ```
 
-The OpenAI provider works with any OpenAI-compatible API by overriding `WithBaseURL`. Point it at Groq, Ollama, or Azure OpenAI Service as needed.
+The OpenAI provider works with any OpenAI-compatible API by overriding `WithBaseURL`. Point it at Groq, LM Studio, or Azure OpenAI Service as needed.
+
+### LM Studio For Local Models
+
+LM Studio can serve local models through OpenAI-compatible and Anthropic-compatible endpoints. In langchain-go you do not need a dedicated provider for that. Use the existing `openai` or `anthropic` provider and override the base URL.
+
+Before using either endpoint:
+
+1. Start LM Studio's local server on the default port `1234`.
+2. Load a model in LM Studio and note its model identifier.
+3. If LM Studio auth is disabled, any placeholder token is fine. If auth is enabled, use your LM Studio API token.
+
+#### OpenAI-compatible endpoint
+
+LM Studio exposes the OpenAI-compatible API under `http://localhost:1234/v1`.
+
+```go
+model := openai.New(
+    openai.WithModelName("qwen2.5-7b-instruct"),
+    openai.WithBaseURL("http://localhost:1234/v1"),
+    openai.WithAPIKey("lm-studio"),
+)
+```
+
+Using the unified provider package:
+
+```go
+model, cleanup, err := provider.NewProvider(
+    ctx,
+    provider.ProviderOpenAI,
+    provider.WithModel("qwen2.5-7b-instruct"),
+    provider.WithBaseURL("http://localhost:1234/v1"),
+    provider.WithAPIKey("lm-studio"),
+)
+if err != nil {
+    return err
+}
+defer cleanup()
+```
+
+#### Anthropic-compatible endpoint
+
+LM Studio also exposes an Anthropic-compatible Messages API at `POST /v1/messages`. For this repo's Anthropic provider, set the base URL to `http://localhost:1234/v1` so requests are sent to `/v1/messages`.
+
+```go
+model := anthropic.New(
+    anthropic.WithModelName("openai/gpt-oss-20b"),
+    anthropic.WithBaseURL("http://localhost:1234/v1"),
+    anthropic.WithAPIKey("lm-studio"),
+    anthropic.WithMaxTokens(1024),
+)
+```
+
+Using the unified provider package:
+
+```go
+model, cleanup, err := provider.NewProvider(
+    ctx,
+    provider.ProviderAnthropic,
+    provider.WithModel("openai/gpt-oss-20b"),
+    provider.WithBaseURL("http://localhost:1234/v1"),
+    provider.WithAPIKey("lm-studio"),
+    provider.WithMaxTokens(1024),
+)
+if err != nil {
+    return err
+}
+defer cleanup()
+```
+
+Notes:
+
+1. `ProviderAnthropic` requires `WithMaxTokens`, even when backed by LM Studio.
+2. If LM Studio authentication is enabled, replace `lm-studio` with the real LM Studio token.
+3. Tool calling and structured output behavior still depend on the local model you load in LM Studio.

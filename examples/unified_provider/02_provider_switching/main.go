@@ -59,7 +59,7 @@ func main() {
 	fmt.Println("\nTry switching providers:")
 	fmt.Println("  LLM_PROVIDER=openai go run main.go")
 	fmt.Println("  LLM_PROVIDER=anthropic go run main.go")
-	fmt.Println("  LLM_PROVIDER=ollama go run main.go")
+	fmt.Println("  LLM_PROVIDER=lmstudio go run main.go")
 	fmt.Println("  LLM_PROVIDER=copilot go run main.go")
 }
 
@@ -86,11 +86,12 @@ func createModel(ctx context.Context, providerName string) (llms.ChatModel, prov
 			provider.WithMaxTokens(200),
 		}
 
-	case "ollama":
-		providerType = provider.ProviderOllama
+	case "lmstudio":
+		providerType = provider.ProviderOpenAI
 		opts = []provider.ProviderOption{
-			provider.WithModel("llama3.2"),
-			provider.WithBaseURL("http://localhost:11434"),
+			provider.WithModel("qwen2.5-7b-instruct"),
+			provider.WithBaseURL("http://localhost:1234/v1"),
+			provider.WithAPIKey("lm-studio"),
 			provider.WithTemperature(0.7),
 		}
 

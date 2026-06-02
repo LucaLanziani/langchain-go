@@ -119,13 +119,6 @@ func validateConfig(config *ProviderConfig, providerType ProviderType) error {
 			// Not an error at validation time
 		}
 
-	case ProviderOllama:
-		// Ollama doesn't require authentication
-		// Set default BaseURL if not provided
-		if config.BaseURL == "" {
-			config.BaseURL = "http://localhost:11434"
-		}
-
 	case ProviderOpenAI:
 		// Check authentication
 		if config.APIKey == "" && os.Getenv("OPENAI_API_KEY") == "" {

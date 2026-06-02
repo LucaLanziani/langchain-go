@@ -16,7 +16,6 @@ type ProviderType string
 const (
 	ProviderAnthropic     ProviderType = "anthropic"
 	ProviderGitHubCopilot ProviderType = "github-copilot"
-	ProviderOllama        ProviderType = "ollama"
 	ProviderOpenAI        ProviderType = "openai"
 )
 
@@ -30,10 +29,10 @@ type ProviderConfig struct {
 	Stop        []string
 
 	// Authentication
-	APIKey string // Anthropic, OpenAI, GitHub Copilot (Ollama doesn't need auth)
+	APIKey string // Anthropic, OpenAI, GitHub Copilot
 
 	// Base URLs
-	BaseURL string // Anthropic, OpenAI, Ollama
+	BaseURL string // Anthropic, OpenAI
 
 	// Provider-specific fields
 	ProviderSpecific map[string]any

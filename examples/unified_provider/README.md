@@ -13,11 +13,11 @@ Before running these examples, ensure you have:
    export GITHUB_TOKEN="your-github-token"  # For Copilot examples
    ```
 
-2. **Ollama** (for local model examples):
+2. **LM Studio** (for local model examples):
    ```bash
-   # Install Ollama from https://ollama.ai
-   ollama pull llama3.2
-   ollama serve  # Start the Ollama server
+    # Start LM Studio's local server on port 1234
+    # Then load a model and note its identifier
+    # The examples use the OpenAI-compatible endpoint at http://localhost:1234/v1
    ```
 
 ## Examples Overview
@@ -27,7 +27,7 @@ Before running these examples, ensure you have:
 #### 1. Single Provider Creation
 **Directory:** `01_single_provider/`
 
-Demonstrates creating individual providers (OpenAI, Anthropic, Ollama, Copilot) using the unified interface.
+Demonstrates creating individual providers (OpenAI, Anthropic, LM Studio, Copilot) using the unified interface.
 
 ```bash
 cd 01_single_provider
@@ -53,7 +53,7 @@ cd 02_provider_switching
 # Try different providers
 LLM_PROVIDER=openai go run main.go
 LLM_PROVIDER=anthropic go run main.go
-LLM_PROVIDER=ollama go run main.go
+LLM_PROVIDER=lmstudio go run main.go
 LLM_PROVIDER=copilot go run main.go
 ```
 
@@ -103,7 +103,7 @@ go run main.go
 #### 5. Weighted Routing
 **Directory:** `05_weighted_routing/`
 
-Routes requests according to provider weights (e.g., 70% to fast provider, 20% to smart, 10% to local).
+Routes requests according to provider weights (e.g., 70% to fast provider, 20% to smart, 10% to a local LM Studio model).
 
 ```bash
 cd 05_weighted_routing
@@ -325,19 +325,15 @@ for name, m := range metrics {
 
 ## Troubleshooting
 
-### Ollama Connection Issues
+### LM Studio Connection Issues
 
-If you see errors connecting to Ollama:
+If you see errors connecting to LM Studio:
 
 ```bash
-# Check if Ollama is running
-curl http://localhost:11434/api/tags
+# Check if the local server is reachable
+curl http://localhost:1234/v1/models
 
-# Start Ollama if not running
-ollama serve
-
-# Pull the model if not available
-ollama pull llama3.2
+# Start LM Studio's local server and load a model if needed
 ```
 
 ### API Key Issues

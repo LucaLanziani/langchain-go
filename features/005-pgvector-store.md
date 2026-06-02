@@ -17,7 +17,7 @@
 - I can configure the table name, embedding dimension, distance metric, and connection pool.
 - Similarity search supports filtering by metadata using PostgreSQL JSONB operators.
 - The store supports the full interface: `AddDocuments`, `SimilaritySearch`, `SimilaritySearchWithScore`, `Delete`.
-- Works with any `embeddings.Embedder` (OpenAI, Ollama, etc.).
+- Works with any `embeddings.Embedder` (OpenAI or other compatible implementations).
 - Connection is managed via `database/sql` + a PostgreSQL driver — no ORM dependency.
 
 ### Example Usage

@@ -163,10 +163,11 @@ func TestProperty9_RouterCleanupCompleteness(t *testing.T) {
 					},
 				},
 				{
-					Name:         "ollama",
-					ProviderType: ProviderOllama,
+					Name:         "openai-backup",
+					ProviderType: ProviderOpenAI,
 					Options: []ProviderOption{
-						WithModel("llama3.1"),
+						WithModel("gpt-4o-mini"),
+						WithAPIKey("test-key"),
 					},
 				},
 			},
@@ -208,8 +209,8 @@ func TestProperty9_RouterCleanupCompleteness(t *testing.T) {
 				{Name: "openai-2", ProviderType: ProviderOpenAI, Options: []ProviderOption{WithModel("gpt-4o"), WithAPIKey("test-key")}},
 				{Name: "anthropic-1", ProviderType: ProviderAnthropic, Options: []ProviderOption{WithModel("claude-sonnet-4-20250514"), WithMaxTokens(4096), WithAPIKey("test-key")}},
 				{Name: "anthropic-2", ProviderType: ProviderAnthropic, Options: []ProviderOption{WithModel("claude-sonnet-4-20250514"), WithMaxTokens(4096), WithAPIKey("test-key")}},
-				{Name: "ollama-1", ProviderType: ProviderOllama, Options: []ProviderOption{WithModel("llama3.1")}},
-				{Name: "ollama-2", ProviderType: ProviderOllama, Options: []ProviderOption{WithModel("llama3.1")}},
+				{Name: "openai-3", ProviderType: ProviderOpenAI, Options: []ProviderOption{WithModel("gpt-4o-mini"), WithAPIKey("test-key")}},
+				{Name: "openai-4", ProviderType: ProviderOpenAI, Options: []ProviderOption{WithModel("gpt-4o-mini"), WithAPIKey("test-key")}},
 			},
 		},
 	}
@@ -338,10 +339,11 @@ func TestProperty9_RouterCleanupCompleteness_ConcurrentCleanup(t *testing.T) {
 			},
 		},
 		{
-			Name:         "ollama",
-			ProviderType: ProviderOllama,
+			Name:         "openai-backup",
+			ProviderType: ProviderOpenAI,
 			Options: []ProviderOption{
-				WithModel("llama3.1"),
+				WithModel("gpt-4o-mini"),
+				WithAPIKey("test-key"),
 			},
 		},
 	}
@@ -479,10 +481,11 @@ func TestProperty9_RouterCleanupCompleteness_WithCustomCleanup(t *testing.T) {
 			},
 		},
 		{
-			Name:         "ollama",
-			ProviderType: ProviderOllama,
+			Name:         "openai-backup",
+			ProviderType: ProviderOpenAI,
 			Options: []ProviderOption{
-				WithModel("llama3.1"),
+				WithModel("gpt-4o-mini"),
+				WithAPIKey("test-key"),
 			},
 		},
 	}
@@ -508,9 +511,9 @@ func TestProperty9_RouterCleanupCompleteness_WithCustomCleanup(t *testing.T) {
 			cleanup2Called.Add(1)
 			return originalCleanups["anthropic"]()
 		},
-		"ollama": func() error {
+		"openai-backup": func() error {
 			cleanup3Called.Add(1)
-			return originalCleanups["ollama"]()
+			return originalCleanups["openai-backup"]()
 		},
 	}
 

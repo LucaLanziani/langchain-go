@@ -198,19 +198,19 @@ func TestProperty21_LLMRoutingGracefulDegradation(t *testing.T) {
 
 			// Create available providers
 			providers := map[string]llms.ChatModel{
-				"openai":    &mockProviderForRouting{name: "openai"},
-				"anthropic": &mockProviderForRouting{name: "anthropic"},
-				"ollama":    &mockProviderForRouting{name: "ollama"},
+				"openai":     &mockProviderForRouting{name: "openai"},
+				"anthropic":  &mockProviderForRouting{name: "anthropic"},
+				"localmodel": &mockProviderForRouting{name: "localmodel"},
 			}
 
 			// Create LLM routing strategy
 			strategy := &LLMRoutingStrategy{
 				model:     mockLLM,
-				providers: []string{"openai", "anthropic", "ollama"},
+				providers: []string{"openai", "anthropic", "localmodel"},
 				providerDescriptions: map[string]string{
-					"openai":    "Fast and cost-effective",
-					"anthropic": "Highly capable",
-					"ollama":    "Local model",
+					"openai":     "Fast and cost-effective",
+					"anthropic":  "Highly capable",
+					"localmodel": "Local model",
 				},
 				cacheTTL: 5 * time.Minute,
 			}
@@ -442,19 +442,19 @@ func TestProperty21_LLMRoutingGracefulDegradation_ConcurrentFailures(t *testing.
 
 	// Create available providers
 	providers := map[string]llms.ChatModel{
-		"openai":    &mockProviderForRouting{name: "openai"},
-		"anthropic": &mockProviderForRouting{name: "anthropic"},
-		"ollama":    &mockProviderForRouting{name: "ollama"},
+		"openai":     &mockProviderForRouting{name: "openai"},
+		"anthropic":  &mockProviderForRouting{name: "anthropic"},
+		"localmodel": &mockProviderForRouting{name: "localmodel"},
 	}
 
 	// Create LLM routing strategy
 	strategy := &LLMRoutingStrategy{
 		model:     mockLLM,
-		providers: []string{"openai", "anthropic", "ollama"},
+		providers: []string{"openai", "anthropic", "localmodel"},
 		providerDescriptions: map[string]string{
-			"openai":    "Fast and cost-effective",
-			"anthropic": "Highly capable",
-			"ollama":    "Local model",
+			"openai":     "Fast and cost-effective",
+			"anthropic":  "Highly capable",
+			"localmodel": "Local model",
 		},
 		cacheTTL: 5 * time.Minute,
 	}
@@ -621,19 +621,19 @@ func TestProperty22_LLMRoutingCacheConsistency(t *testing.T) {
 
 		// Create available providers
 		providers := map[string]llms.ChatModel{
-			"openai":    &mockProviderForRouting{name: "openai"},
-			"anthropic": &mockProviderForRouting{name: "anthropic"},
-			"ollama":    &mockProviderForRouting{name: "ollama"},
+			"openai":     &mockProviderForRouting{name: "openai"},
+			"anthropic":  &mockProviderForRouting{name: "anthropic"},
+			"localmodel": &mockProviderForRouting{name: "localmodel"},
 		}
 
 		// Create LLM routing strategy with cache
 		strategy := &LLMRoutingStrategy{
 			model:     mockLLM,
-			providers: []string{"openai", "anthropic", "ollama"},
+			providers: []string{"openai", "anthropic", "localmodel"},
 			providerDescriptions: map[string]string{
-				"openai":    "Fast and cost-effective",
-				"anthropic": "Highly capable",
-				"ollama":    "Local model",
+				"openai":     "Fast and cost-effective",
+				"anthropic":  "Highly capable",
+				"localmodel": "Local model",
 			},
 			cacheTTL: 5 * time.Minute,
 		}
@@ -763,28 +763,28 @@ func TestProperty22_LLMRoutingCacheConsistency(t *testing.T) {
 	})
 
 	t.Run("cache miss when provider no longer available", func(t *testing.T) {
-		// Create mock LLM that returns "ollama"
+		// Create mock LLM that returns "copilot"
 		mockLLM := &mockLLMForRouting{
-			response:   "ollama",
+			response:   "copilot",
 			err:        nil,
 			shouldFail: false,
 		}
 
-		// Create initial providers including ollama
+		// Create initial providers including copilot
 		initialProviders := map[string]llms.ChatModel{
 			"openai":    &mockProviderForRouting{name: "openai"},
 			"anthropic": &mockProviderForRouting{name: "anthropic"},
-			"ollama":    &mockProviderForRouting{name: "ollama"},
+			"copilot":   &mockProviderForRouting{name: "copilot"},
 		}
 
 		// Create LLM routing strategy
 		strategy := &LLMRoutingStrategy{
 			model:     mockLLM,
-			providers: []string{"openai", "anthropic", "ollama"},
+			providers: []string{"openai", "anthropic", "copilot"},
 			providerDescriptions: map[string]string{
 				"openai":    "Fast and cost-effective",
 				"anthropic": "Highly capable",
-				"ollama":    "Local model",
+				"copilot":   "Assistant-style provider",
 			},
 			cacheTTL: 5 * time.Minute,
 		}
@@ -801,26 +801,26 @@ func TestProperty22_LLMRoutingCacheConsistency(t *testing.T) {
 			Complexity:   "simple",
 		}
 
-		// First call - should cache "ollama"
+		// First call - should cache "copilot"
 		providerName1, err := strategy.SelectProvider(ctx, reqCtx, initialProviders)
 		if err != nil {
 			t.Fatalf("First SelectProvider call failed: %v", err)
 		}
 
-		if providerName1 != "ollama" {
-			t.Errorf("Expected 'ollama', got '%s'", providerName1)
+		if providerName1 != "copilot" {
+			t.Errorf("Expected 'copilot', got '%s'", providerName1)
 		}
 
-		// Simulate ollama becoming unavailable
-		providersWithoutOllama := map[string]llms.ChatModel{
+		// Simulate copilot becoming unavailable
+		providersWithoutCopilot := map[string]llms.ChatModel{
 			"openai":    &mockProviderForRouting{name: "openai"},
 			"anthropic": &mockProviderForRouting{name: "anthropic"},
 		}
 
-		// Second call - cached provider "ollama" is no longer available
-		// Should detect this and call LLM again, but LLM still returns "ollama"
+		// Second call - cached provider "copilot" is no longer available
+		// Should detect this and call LLM again, but LLM still returns "copilot"
 		// Strategy should fallback to an available provider
-		providerName2, err := strategy.SelectProvider(ctx, reqCtx, providersWithoutOllama)
+		providerName2, err := strategy.SelectProvider(ctx, reqCtx, providersWithoutCopilot)
 
 		// Error is expected because LLM returned invalid provider
 		if err == nil {
@@ -832,17 +832,17 @@ func TestProperty22_LLMRoutingCacheConsistency(t *testing.T) {
 			t.Fatal("Expected fallback provider, got empty string")
 		}
 
-		// Verify returned provider is valid (not the cached "ollama")
-		if _, exists := providersWithoutOllama[providerName2]; !exists {
+		// Verify returned provider is valid (not the cached "copilot")
+		if _, exists := providersWithoutCopilot[providerName2]; !exists {
 			t.Errorf("Returned provider '%s' is not in available providers", providerName2)
 		}
 
 		// Verify it's not the cached provider
-		if providerName2 == "ollama" {
-			t.Error("Should not return cached provider 'ollama' when it's unavailable")
+		if providerName2 == "copilot" {
+			t.Error("Should not return cached provider 'copilot' when it's unavailable")
 		}
 
-		t.Logf("✓ Cache miss detected when cached provider 'ollama' became unavailable, fell back to '%s'", providerName2)
+		t.Logf("✓ Cache miss detected when cached provider 'copilot' became unavailable, fell back to '%s'", providerName2)
 	})
 
 	t.Run("cache consistency under concurrent access", func(t *testing.T) {
@@ -855,19 +855,19 @@ func TestProperty22_LLMRoutingCacheConsistency(t *testing.T) {
 
 		// Create available providers
 		providers := map[string]llms.ChatModel{
-			"openai":    &mockProviderForRouting{name: "openai"},
-			"anthropic": &mockProviderForRouting{name: "anthropic"},
-			"ollama":    &mockProviderForRouting{name: "ollama"},
+			"openai":     &mockProviderForRouting{name: "openai"},
+			"anthropic":  &mockProviderForRouting{name: "anthropic"},
+			"localmodel": &mockProviderForRouting{name: "localmodel"},
 		}
 
 		// Create LLM routing strategy
 		strategy := &LLMRoutingStrategy{
 			model:     mockLLM,
-			providers: []string{"openai", "anthropic", "ollama"},
+			providers: []string{"openai", "anthropic", "localmodel"},
 			providerDescriptions: map[string]string{
-				"openai":    "Fast and cost-effective",
-				"anthropic": "Highly capable",
-				"ollama":    "Local model",
+				"openai":     "Fast and cost-effective",
+				"anthropic":  "Highly capable",
+				"localmodel": "Local model",
 			},
 			cacheTTL: 5 * time.Minute,
 		}
@@ -1093,19 +1093,19 @@ func TestProperty23_LLMRoutingDeterminismWithCache(t *testing.T) {
 
 		// Create available providers
 		providers := map[string]llms.ChatModel{
-			"openai":    &mockProviderForRouting{name: "openai"},
-			"anthropic": &mockProviderForRouting{name: "anthropic"},
-			"ollama":    &mockProviderForRouting{name: "ollama"},
+			"openai":     &mockProviderForRouting{name: "openai"},
+			"anthropic":  &mockProviderForRouting{name: "anthropic"},
+			"localmodel": &mockProviderForRouting{name: "localmodel"},
 		}
 
 		// Create LLM routing strategy with cache
 		strategy := &LLMRoutingStrategy{
 			model:     mockLLM,
-			providers: []string{"openai", "anthropic", "ollama"},
+			providers: []string{"openai", "anthropic", "localmodel"},
 			providerDescriptions: map[string]string{
-				"openai":    "Fast and cost-effective",
-				"anthropic": "Highly capable",
-				"ollama":    "Local model",
+				"openai":     "Fast and cost-effective",
+				"anthropic":  "Highly capable",
+				"localmodel": "Local model",
 			},
 			cacheTTL: 5 * time.Minute,
 		}
@@ -1255,19 +1255,19 @@ func TestProperty23_LLMRoutingDeterminismWithCache(t *testing.T) {
 
 		// Create available providers
 		providers := map[string]llms.ChatModel{
-			"openai":    &mockProviderForRouting{name: "openai"},
-			"anthropic": &mockProviderForRouting{name: "anthropic"},
-			"ollama":    &mockProviderForRouting{name: "ollama"},
+			"openai":     &mockProviderForRouting{name: "openai"},
+			"anthropic":  &mockProviderForRouting{name: "anthropic"},
+			"localmodel": &mockProviderForRouting{name: "localmodel"},
 		}
 
 		// Create LLM routing strategy
 		strategy := &LLMRoutingStrategy{
 			model:     mockLLM,
-			providers: []string{"openai", "anthropic", "ollama"},
+			providers: []string{"openai", "anthropic", "localmodel"},
 			providerDescriptions: map[string]string{
-				"openai":    "Fast and cost-effective",
-				"anthropic": "Highly capable",
-				"ollama":    "Local model",
+				"openai":     "Fast and cost-effective",
+				"anthropic":  "Highly capable",
+				"localmodel": "Local model",
 			},
 			cacheTTL: 5 * time.Minute,
 		}
@@ -1472,24 +1472,24 @@ func TestProperty23_LLMRoutingDeterminismWithCache(t *testing.T) {
 				}
 			}
 
-			return core.NewAIMessage("ollama"), nil
+			return core.NewAIMessage("localmodel"), nil
 		}
 
 		// Create available providers
 		providers := map[string]llms.ChatModel{
-			"openai":    &mockProviderForRouting{name: "openai"},
-			"anthropic": &mockProviderForRouting{name: "anthropic"},
-			"ollama":    &mockProviderForRouting{name: "ollama"},
+			"openai":     &mockProviderForRouting{name: "openai"},
+			"anthropic":  &mockProviderForRouting{name: "anthropic"},
+			"localmodel": &mockProviderForRouting{name: "localmodel"},
 		}
 
 		// Create LLM routing strategy
 		strategy := &LLMRoutingStrategy{
 			model:     mockLLM,
-			providers: []string{"openai", "anthropic", "ollama"},
+			providers: []string{"openai", "anthropic", "localmodel"},
 			providerDescriptions: map[string]string{
-				"openai":    "Fast and cost-effective",
-				"anthropic": "Highly capable",
-				"ollama":    "Local model",
+				"openai":     "Fast and cost-effective",
+				"anthropic":  "Highly capable",
+				"localmodel": "Local model",
 			},
 			cacheTTL: 5 * time.Minute,
 		}
@@ -1566,7 +1566,7 @@ func TestProperty23_LLMRoutingDeterminismWithCache(t *testing.T) {
 
 	t.Run("cache provides determinism even when LLM is non-deterministic", func(t *testing.T) {
 		// Create mock LLM that returns random providers (non-deterministic)
-		providerList := []string{"openai", "anthropic", "ollama"}
+		providerList := []string{"openai", "anthropic", "localmodel"}
 		callCount := 0
 		var mu sync.Mutex
 
@@ -1589,19 +1589,19 @@ func TestProperty23_LLMRoutingDeterminismWithCache(t *testing.T) {
 
 		// Create available providers
 		availableProviders := map[string]llms.ChatModel{
-			"openai":    &mockProviderForRouting{name: "openai"},
-			"anthropic": &mockProviderForRouting{name: "anthropic"},
-			"ollama":    &mockProviderForRouting{name: "ollama"},
+			"openai":     &mockProviderForRouting{name: "openai"},
+			"anthropic":  &mockProviderForRouting{name: "anthropic"},
+			"localmodel": &mockProviderForRouting{name: "localmodel"},
 		}
 
 		// Create LLM routing strategy
 		strategy := &LLMRoutingStrategy{
 			model:     mockLLM,
-			providers: []string{"openai", "anthropic", "ollama"},
+			providers: []string{"openai", "anthropic", "localmodel"},
 			providerDescriptions: map[string]string{
-				"openai":    "Fast and cost-effective",
-				"anthropic": "Highly capable",
-				"ollama":    "Local model",
+				"openai":     "Fast and cost-effective",
+				"anthropic":  "Highly capable",
+				"localmodel": "Local model",
 			},
 			cacheTTL: 5 * time.Minute,
 		}
@@ -2314,8 +2314,8 @@ func TestLLMRouting_ProviderNameParsing(t *testing.T) {
 		},
 		{
 			name:     "provider name in backticks",
-			response: "`ollama`",
-			expected: "ollama",
+			response: "`localmodel`",
+			expected: "localmodel",
 		},
 		{
 			name:     "uppercase provider name",
@@ -2367,18 +2367,18 @@ func TestLLMRouting_OnSuccessOnError(t *testing.T) {
 // Validates: Requirement 11.1
 func TestLLMRouting_PromptBuilding(t *testing.T) {
 	strategy := &LLMRoutingStrategy{
-		providers: []string{"openai", "anthropic", "ollama"},
+		providers: []string{"openai", "anthropic", "localmodel"},
 		providerDescriptions: map[string]string{
-			"openai":    "Fast and cost-effective",
-			"anthropic": "Highly capable for complex tasks",
-			"ollama":    "Local model for privacy",
+			"openai":     "Fast and cost-effective",
+			"anthropic":  "Highly capable for complex tasks",
+			"localmodel": "Local model for privacy",
 		},
 	}
 
 	providers := map[string]llms.ChatModel{
-		"openai":    &mockProviderForRouting{name: "openai"},
-		"anthropic": &mockProviderForRouting{name: "anthropic"},
-		"ollama":    &mockProviderForRouting{name: "ollama"},
+		"openai":     &mockProviderForRouting{name: "openai"},
+		"anthropic":  &mockProviderForRouting{name: "anthropic"},
+		"localmodel": &mockProviderForRouting{name: "localmodel"},
 	}
 
 	reqCtx := RequestContext{
@@ -2424,8 +2424,8 @@ func TestLLMRouting_PromptBuilding(t *testing.T) {
 		t.Error("Prompt should contain anthropic description")
 	}
 
-	if !strings.Contains(prompt, "ollama: Local model for privacy") {
-		t.Error("Prompt should contain ollama description")
+	if !strings.Contains(prompt, "localmodel: Local model for privacy") {
+		t.Error("Prompt should contain localmodel description")
 	}
 
 	t.Log("✓ Routing prompt built correctly with all required information")
